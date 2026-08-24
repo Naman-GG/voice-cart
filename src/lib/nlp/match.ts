@@ -97,3 +97,32 @@ export function matchProductInText(text: string): Product | null {
   const tokens = normalize(text).split(" ").filter(Boolean);
   return tokens.length ? matchProduct(tokens)?.product ?? null : null;
 }
+
+/**
+ * Every exact product mention in a token list, left to right, longest alias
+ * first and non-overlapping.
+ *
+ * Deliberately exact-only: it drives multi-item splitting, where a stray
+ * fuzzy hit would invent an item the shopper never asked for.
+ */
+export function findExactProducts(tokens: string[]): ProductMatch[] {
+  const found: ProductMatch[] = [];
+  let index = 0;
+
+  while (index < tokens.length) {
+    let advanced = false;
+    const maxSpan = Math.min(MAX_ALIAS_WORDS, tokens.length - index);
+    for (let span = maxSpan; span >= 1; span -= 1) {
+      const id = lookup(tokens.slice(index, index + span).join(" "));
+      if (!id) continue;
+      const product = PRODUCTS_BY_ID.get(id);
+      if (!product) continue;
+      found.push({ product, start: index, end: index + span, confidence: 1 });
+      index += span;
+      advanced = true;
+      break;
+    }
+    if (!advanced) index += 1;
+  }
+  return found;
+}

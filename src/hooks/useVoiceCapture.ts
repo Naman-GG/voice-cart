@@ -55,10 +55,19 @@ const MIN_LOUD_MS = 170;
 /** Ignore gaps longer than this between level reports (tab was suspended). */
 const MAX_SAMPLE_GAP = 120;
 const MIN_THRESHOLD = 0.018;
-/** Room reverb of the assistant's own voice outlives the utterance itself. */
-const UNMUTE_GRACE = 900;
+/**
+ * Room reverb of the assistant's own voice outlives the utterance itself,
+ * but only just: echo cancellation handles the rest. Anything longer reads as
+ * the app ignoring you right after it asks a question.
+ */
+const UNMUTE_GRACE = 450;
 /** Let the noise floor converge before the detector is allowed to fire. */
 const VAD_WARMUP = 700;
+/**
+ * Re-arm delay after the assistant speaks. Short, because the noise floor is
+ * frozen while muted and so is still valid — there is nothing to re-learn.
+ */
+const UNMUTE_REARM = 150;
 /** Keep the mic warm this long after a clip so repeat commands are instant. */
 const WARM_RELEASE = 30_000;
 /**
@@ -154,10 +163,10 @@ export function useVoiceCapture({
     if (muted) {
       mutedUntilRef.current = Number.POSITIVE_INFINITY;
     } else if (mutedUntilRef.current === Number.POSITIVE_INFINITY) {
+      // The floor was frozen while muted, so it still describes the room and
+      // does not need relearning; only the echo tail has to pass.
       mutedUntilRef.current = performance.now() + UNMUTE_GRACE;
-      // Re-warm after speaking: the floor was frozen while muted.
-      vadReadyAtRef.current = performance.now() + UNMUTE_GRACE + VAD_WARMUP;
-      noiseFloorRef.current = 0.01;
+      vadReadyAtRef.current = performance.now() + UNMUTE_GRACE + UNMUTE_REARM;
       loudRunMsRef.current = 0;
     }
   }, [muted]);

@@ -304,3 +304,41 @@ describe("Real Hindi Whisper transcripts", () => {
     expect(parse("क्ष्त्रज्ञ जोड़ो", "hi").items[0]?.productId ?? null).toBeNull();
   });
 });
+
+describe("Several items inside one clause", () => {
+  it("handles the reported 'along with' phrasing", () => {
+    const result = parse("Add 1 kg apples and 1 kg bananas along with 1 kg coriander.");
+    expect(result.intent).toBe("add");
+    expect(result.items.map((item) => item.productId)).toEqual(["apple", "banana", "coriander"]);
+    for (const item of result.items) {
+      expect(item, item.name).toMatchObject({ quantity: 1, unit: "kg" });
+    }
+  });
+
+  it("splits products even without a conjunction between them", () => {
+    const result = parse("add 2 kg rice 3 apples 1 loaf bread");
+    expect(result.items.map((item) => item.productId)).toEqual(["rice", "apple", "bread"]);
+    expect(result.items[0]).toMatchObject({ quantity: 2, unit: "kg" });
+    expect(result.items[1]).toMatchObject({ quantity: 3, unit: "piece" });
+    expect(result.items[2]).toMatchObject({ quantity: 1, unit: "loaf" });
+  });
+
+  it("keeps per-item modifiers with the right item", () => {
+    const result = parse("add organic apples as well as 2 litres milk");
+    expect(result.items.map((item) => item.productId)).toEqual(["apple", "milk"]);
+    expect(result.items[0].notes).toContain("organic");
+    expect(result.items[1]).toMatchObject({ quantity: 2, unit: "l" });
+  });
+
+  it("does not invent items from a single fuzzy match", () => {
+    const result = parse("add tomatos");
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].productId).toBe("tomato");
+  });
+
+  it("works the same way in Hindi", () => {
+    const result = parse("एक किलो सेब और दो किलो चावल चाहिए", "hi");
+    expect(result.items.map((item) => item.productId)).toEqual(["apple", "rice"]);
+    expect(result.items[1]).toMatchObject({ quantity: 2, unit: "kg" });
+  });
+});

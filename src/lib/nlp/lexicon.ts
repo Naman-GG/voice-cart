@@ -162,7 +162,8 @@ export const MODIFIER_WORDS = new Set([
 ]);
 
 /** Conjunctions that separate multiple items inside one utterance. */
-export const SPLIT_PATTERN = /\s*(?:,|;|\band\b|\balso\b|\bplus\b|\baur\b|और|तथा|\&)\s*/;
+export const SPLIT_PATTERN =
+  /\s*(?:,|;|\balong with\b|\bas well as\b|\btogether with\b|\band\b|\balso\b|\bplus\b|\baur\b|और|तथा|\&)\s*/;
 
 export const PRICE_UNDER = /(?:under|below|less than|cheaper than|up ?to|within|max(?:imum)?|से कम|के अंदर|तक)\s*\$?\s*(\d+(?:\.\d+)?)/;
 export const PRICE_OVER = /(?:over|above|more than|at least|min(?:imum)?|से (?:ज्यादा|अधिक))\s*\$?\s*(\d+(?:\.\d+)?)/;

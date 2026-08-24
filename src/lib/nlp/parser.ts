@@ -1,5 +1,5 @@
 import { ALL_BRANDS, getProduct } from "../catalog";
-import type { CategoryId, Lang, SearchFilters, Unit } from "../types";
+import type { CategoryId, Lang, Product, SearchFilters, Unit } from "../types";
 import {
   FILLER_WORDS,
   INTENT_PATTERNS,
@@ -13,7 +13,7 @@ import {
   UNIT_WORDS,
   type Intent,
 } from "./lexicon";
-import { matchProduct } from "./match";
+import { findExactProducts, matchProduct } from "./match";
 import { hasDevanagari, normalize } from "./normalize";
 
 export interface ParsedItem {
@@ -173,49 +173,91 @@ function titleCase(text: string): string {
   return text.replace(/\b[a-z]/g, (character) => character.toUpperCase());
 }
 
-function parseSegment(segment: string, intent: Intent): ParsedItem | null {
-  const { brand, rest: withoutBrand } = extractBrand(segment);
-  let tokens = withoutBrand.split(" ").filter(Boolean);
-  if (!tokens.length) return null;
-
-  const quantityResult = extractQuantity(tokens, intent === "update_quantity");
-  tokens = quantityResult.rest;
-
-  const modifierResult = extractModifiers(tokens);
-  tokens = modifierResult.rest.filter((token) => !FILLER_WORDS.has(token));
-  if (!tokens.length) return null;
-
-  const match = matchProduct(tokens);
-  if (match) {
-    const product = match.product;
-    // Only an explicitly spoken unit survives. Falling back to the catalog
-    // unit produced nonsense like "1 g toothpaste"; a shopper who does not
-    // say a unit means "one of these".
-    const unit: Unit = quantityResult.unit ?? "piece";
-    return {
-      productId: product.id,
-      name: product.name.en,
-      category: product.category,
-      quantity: quantityResult.quantity ?? 1,
-      unit,
-      brand,
-      notes: modifierResult.notes,
-      confidence: match.confidence,
-    };
-  }
-
-  const freeText = tokens.join(" ").trim();
-  if (freeText.length < 2) return null;
+/** Builds one item from a product match plus the words that qualify it. */
+function itemFromMatch(
+  product: Product,
+  qualifiers: string[],
+  brand: string | undefined,
+  confidence: number,
+): ParsedItem {
+  // A qualifier window holds only the words describing this item, so a lone
+  // trailing number is its quantity ("... 3 apples"). The guard against Hindi
+  // verb tails like "हटा दो" only matters on a whole segment.
+  const quantityResult = extractQuantity(qualifiers, true);
+  const modifierResult = extractModifiers(quantityResult.rest);
   return {
-    productId: null,
-    name: titleCase(freeText),
-    category: "other",
+    productId: product.id,
+    name: product.name.en,
+    category: product.category,
     quantity: quantityResult.quantity ?? 1,
+    // Only a spoken unit survives; an unspoken one means "one of these".
     unit: quantityResult.unit ?? "piece",
     brand,
     notes: modifierResult.notes,
-    confidence: 0.45,
+    confidence,
   };
+}
+
+/**
+ * Parses one conjunction-delimited segment into items.
+ *
+ * A segment usually holds a single item, but phrasings like "1 kg bananas
+ * along with 1 kg coriander" pack several into one. Whenever two or more
+ * products are named outright, the words before each one are treated as that
+ * item's quantity and modifiers.
+ */
+function parseSegment(segment: string, intent: Intent): ParsedItem[] {
+  const { brand, rest: withoutBrand } = extractBrand(segment);
+  const tokens = withoutBrand.split(" ").filter(Boolean);
+  if (!tokens.length) return [];
+
+  const exact = findExactProducts(tokens);
+  if (exact.length > 1) {
+    const items: ParsedItem[] = [];
+    let cursor = 0;
+    for (const match of exact) {
+      const qualifiers = tokens.slice(cursor, match.start).filter((token) => !FILLER_WORDS.has(token));
+      items.push(itemFromMatch(match.product, qualifiers, brand, match.confidence));
+      cursor = match.end;
+    }
+    return items;
+  }
+
+  const quantityResult = extractQuantity(tokens, intent === "update_quantity");
+  const modifierResult = extractModifiers(quantityResult.rest);
+  const remaining = modifierResult.rest.filter((token) => !FILLER_WORDS.has(token));
+  if (!remaining.length) return [];
+
+  const match = matchProduct(remaining);
+  if (match) {
+    return [
+      {
+        productId: match.product.id,
+        name: match.product.name.en,
+        category: match.product.category,
+        quantity: quantityResult.quantity ?? 1,
+        unit: quantityResult.unit ?? "piece",
+        brand,
+        notes: modifierResult.notes,
+        confidence: match.confidence,
+      },
+    ];
+  }
+
+  const freeText = remaining.join(" ").trim();
+  if (freeText.length < 2) return [];
+  return [
+    {
+      productId: null,
+      name: titleCase(freeText),
+      category: "other",
+      quantity: quantityResult.quantity ?? 1,
+      unit: quantityResult.unit ?? "piece",
+      brand,
+      notes: modifierResult.notes,
+      confidence: 0.45,
+    },
+  ];
 }
 
 /**
@@ -237,9 +279,7 @@ export function parseCommand(transcript: string, defaultLang: Lang = "en"): Pars
   const body = sizeMatch ? afterPrice.replace(sizeMatch[0], " ").trim() : afterPrice;
 
   const segments = body.split(SPLIT_PATTERN).map((part) => part.trim()).filter(Boolean);
-  const items = segments
-    .map((segment) => parseSegment(segment, detected))
-    .filter((item): item is ParsedItem => item !== null);
+  const items = segments.flatMap((segment) => parseSegment(segment, detected));
 
   // A bare catalog product name ("bananas") is an implicit add. Unrecognised
   // words with no command verb stay "unknown" so we ask instead of guessing.
