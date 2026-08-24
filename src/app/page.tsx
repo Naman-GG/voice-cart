@@ -157,6 +157,14 @@ export default function Page() {
     [markActivity],
   );
 
+  // Hands-free gave up after a long silence; reflect that in the toggle
+  // rather than leaving it on with a dead microphone.
+  const handleIdleTimeout = useCallback(() => {
+    setHandsFree(false);
+    setNudge(null);
+    dispatch({ type: "set-feedback", feedback: { tone: "info", message: T.micIdleOff } });
+  }, []);
+
   const capture = useVoiceCapture({
     lang: state.lang,
     handsFree,
@@ -164,6 +172,7 @@ export default function Page() {
     onTranscript: handleTranscript,
     onError: handleCaptureError,
     onSpeechStart: markActivity,
+    onIdleTimeout: handleIdleTimeout,
   });
 
   // Speak every reply except the transient "…" progress messages.

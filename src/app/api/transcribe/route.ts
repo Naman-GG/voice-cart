@@ -18,9 +18,68 @@ const DOMAIN_PROMPTS: Record<string, string> = {
   hi: "खरीदारी की सूची: जोड़ो, हटाओ, चाहिए, ढूंढो, लिस्ट। सामान: दूध, ब्रेड, अंडे, सेब, केला, प्याज, आलू, टमाटर, चावल, आटा, दाल, पनीर, दही, घी, टूथपेस्ट, शैम्पू।",
 };
 
+interface GroqSegment {
+  text?: string;
+  no_speech_prob?: number;
+  avg_logprob?: number;
+}
+
 interface GroqTranscription {
   text?: string;
+  segments?: GroqSegment[];
   error?: { message?: string };
+}
+
+/**
+ * Whisper hallucinates stock phrases when handed silence or noise — usually
+ * fragments of the subtitle corpora it was trained on. The domain prompt makes
+ * it *confident* about those, so no_speech_prob alone is not enough and
+ * avg_logprob has to carry the decision.
+ *
+ * Measured on this endpoint: silence scores no_speech 0.17 / avg_logprob -1.04,
+ * real speech scores 0.002 / -0.24.
+ */
+const HALLUCINATION_PATTERNS = [
+  /^you$/,
+  /^thank(s| you)\.?$/,
+  /^(bye|okay|oh|hmm|uh|um)$/,
+  /thank(s| you)? for watching/,
+  /please subscribe/,
+  /subscribe to (our|the) channel/,
+  /amara\.?org/,
+  /transcription by/,
+  /subtitles? by/,
+  /^(धन्यवाद|शुक्रिया)$/,
+];
+
+/** Above this the model itself reports the clip contains no speech. */
+const NO_SPEECH_LIMIT = 0.6;
+/** Whisper's own "failed decode" heuristic sits at -1.0; -0.95 adds margin. */
+const LOW_CONFIDENCE_LOGPROB = -0.95;
+
+/** Letters or digits in any script, so Devanagari counts as real content. */
+function hasRealContent(text: string): boolean {
+  return /[\p{L}\p{N}]/u.test(text);
+}
+
+function isLikelySilence(text: string, segments: GroqSegment[] | undefined): boolean {
+  if (!hasRealContent(text)) return true;
+
+  const stripped = text
+    .toLowerCase()
+    .replace(/[.,!?;:"'`\-–—…।॥]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!stripped) return true;
+  if (HALLUCINATION_PATTERNS.some((pattern) => pattern.test(stripped))) return true;
+
+  if (!segments?.length) return false;
+  if (segments.every((segment) => (segment.no_speech_prob ?? 0) > NO_SPEECH_LIMIT)) return true;
+
+  const scored = segments.filter((segment) => typeof segment.avg_logprob === "number");
+  if (!scored.length) return false;
+  const meanLogprob = scored.reduce((sum, segment) => sum + (segment.avg_logprob ?? 0), 0) / scored.length;
+  return meanLogprob < LOW_CONFIDENCE_LOGPROB;
 }
 
 function fail(message: string, status: number, code: string) {
@@ -58,7 +117,7 @@ export async function POST(request: Request) {
   upstream.set("file", audio, audio.name || "speech.webm");
   upstream.set("model", MODEL);
   upstream.set("language", language);
-  upstream.set("response_format", "json");
+  upstream.set("response_format", "verbose_json");
   upstream.set("temperature", "0");
   upstream.set("prompt", DOMAIN_PROMPTS[language] ?? DOMAIN_PROMPTS.en);
 
@@ -80,7 +139,11 @@ export async function POST(request: Request) {
       return fail("Transcription failed upstream.", 502, "upstream_error");
     }
 
-    return NextResponse.json({ text: (payload.text ?? "").trim(), model: MODEL, language });
+    const text = (payload.text ?? "").trim();
+    // An empty string tells the client "no speech", which it reports gently
+    // instead of pushing a nonsense command through the parser.
+    const usable = isLikelySilence(text, payload.segments) ? "" : text;
+    return NextResponse.json({ text: usable, model: MODEL, language });
   } catch (error) {
     const timedOut = error instanceof Error && error.name === "TimeoutError";
     console.error("Whisper transcription errored", error);

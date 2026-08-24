@@ -46,6 +46,10 @@ export const T = {
     hi: "माइक्रोफ़ोन की अनुमति नहीं मिली। ब्राउज़र सेटिंग में इसे चालू करें।",
   },
   micError: { en: "Could not reach the microphone. Please try again.", hi: "माइक्रोफ़ोन नहीं मिला। दोबारा कोशिश करें।" },
+  micIdleOff: {
+    en: "Microphone switched off after a minute of silence. Tap the mic to carry on.",
+    hi: "एक मिनट तक कुछ न बोलने पर माइक्रोफ़ोन बंद कर दिया। जारी रखने के लिए माइक दबाएँ।",
+  },
   noSpeech: { en: "I didn't catch that — try again.", hi: "समझ नहीं आया — फिर से बोलिए।" },
   transcribeFailed: {
     en: "Transcription failed. Check your connection and try again.",
@@ -58,6 +62,7 @@ export const T = {
 
   // Live capture states
   statusIdle: { en: "Tap to speak", hi: "बोलने के लिए दबाएँ" },
+  statusOpening: { en: "Starting the microphone…", hi: "माइक्रोफ़ोन शुरू हो रहा है…" },
   statusListening: { en: "Listening — just start talking", hi: "सुन रहे हैं — बस बोलिए" },
   statusRecording: { en: "Recording…", hi: "रिकॉर्ड हो रहा है…" },
   statusTranscribing: { en: "Transcribing with Whisper…", hi: "व्हिस्पर से समझ रहे हैं…" },

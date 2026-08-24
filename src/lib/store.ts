@@ -87,9 +87,13 @@ function itemLabel(item: ListItem, lang: Lang): string {
   return product ? product.name[lang] : item.name;
 }
 
+/** Units that carry no information at quantity one — nobody says "1 g toothpaste". */
+const IMPLIED_AT_ONE: ReadonlySet<Unit> = new Set(["piece", "g", "ml"]);
+
 export function quantityLabel(item: ListItem, lang: Lang): string {
   const quantity = Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2);
-  return item.unit === "piece" && item.quantity === 1 ? "" : `${quantity} ${unitLabel(item.unit, lang)}`;
+  if (item.quantity === 1 && IMPLIED_AT_ONE.has(item.unit)) return "";
+  return `${quantity} ${unitLabel(item.unit, lang)}`;
 }
 
 export function estimatedTotal(items: ListItem[]): number {

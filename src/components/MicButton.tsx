@@ -19,18 +19,22 @@ interface Props {
 /** Per-bar multipliers give the waveform a natural centre-weighted shape. */
 const BAR_WEIGHTS = [0.45, 0.78, 1, 0.78, 0.45];
 
-type Visual = "idle" | "listening" | "recording" | "transcribing" | "speaking";
+type Visual = "idle" | "opening" | "listening" | "recording" | "transcribing" | "speaking";
 
 function resolveVisual(status: CaptureStatus, speaking: boolean): Visual {
-  if (speaking) return "speaking";
-  if (status === "transcribing") return "transcribing";
+  // Recording wins over speaking: if the user talks over the assistant,
+  // show what the microphone is actually doing.
   if (status === "recording") return "recording";
+  if (speaking) return "speaking";
+  if (status === "opening") return "opening";
+  if (status === "transcribing") return "transcribing";
   if (status === "listening") return "listening";
   return "idle";
 }
 
 const LABEL_KEYS: Record<Visual, keyof typeof T> = {
   idle: "statusIdle",
+  opening: "statusOpening",
   listening: "statusListening",
   recording: "statusRecording",
   transcribing: "statusTranscribing",
@@ -39,6 +43,7 @@ const LABEL_KEYS: Record<Visual, keyof typeof T> = {
 
 const ORB_STYLES: Record<Visual, string> = {
   idle: "bg-accent text-[color:var(--accent-contrast)]",
+  opening: "bg-accent/70 text-[color:var(--accent-contrast)]",
   listening: "bg-accent text-[color:var(--accent-contrast)]",
   recording: "bg-danger text-white",
   transcribing: "bg-warning text-white",
@@ -97,7 +102,7 @@ export function MicButton({
                 />
               ))}
             </span>
-          ) : visual === "transcribing" ? (
+          ) : visual === "transcribing" || visual === "opening" ? (
             <SpinnerIcon />
           ) : visual === "speaking" ? (
             <SpeakerIcon />
