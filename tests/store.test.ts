@@ -117,6 +117,13 @@ describe("responses", () => {
     expect(state.feedback?.tone).toBe("warning");
   });
 
+  it("opens the command reference on help and closes it on the next command", () => {
+    let state = run(initialState, "help");
+    expect(state.helpOpen).toBe(true);
+    state = run(state, "add milk");
+    expect(state.helpOpen).toBe(false);
+  });
+
   it("enters a loading state for searches", () => {
     const state = run(initialState, "find toothpaste under $5");
     expect(state.search?.loading).toBe(true);

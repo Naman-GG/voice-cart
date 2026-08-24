@@ -32,7 +32,7 @@ Two deliberately different halves:
   sharpen recall further.
 - **Understanding is local and deterministic.** Once there is a transcript, intent
   parsing is a **rule-based NLP pipeline** written from scratch — no LLM in the loop.
-  That keeps interpretation free, instant, and covered by **100 unit tests**.
+  That keeps interpretation free, instant, and covered by **103 unit tests**.
 
 ---
 
@@ -112,6 +112,8 @@ Cadence is *learned*: if you actually buy rice every 4 days, that beats the cata
 - Minimalist, mobile-first, single-column on phones and two-column on desktop.
 - **Real-time visual feedback** for every recognised command, colour-coded by outcome.
 - Loading skeletons while the saved list hydrates and while a search is in flight.
+- Saying **"help"** opens an on-screen command reference grouped by task, with every
+  example runnable by tap — a spoken one-liner is too easy to miss.
 - Light and dark themes, full keyboard access, ARIA live regions for screen readers.
 - Graceful degradation: browsers without the Speech API get a clear message and a
   **text command bar** that runs the exact same parser.
@@ -130,7 +132,7 @@ Cadence is *learned*: if you actually buy rice every 4 days, that beats the cata
 | Clear | "clear my list" | "पूरी लिस्ट हटाओ" |
 | Read back | "what's on my list" | "लिस्ट में क्या है" |
 | Search | "find toothpaste under $5" | "टूथपेस्ट ढूंढो" |
-| Help | "help" | "मदद" |
+| Help | "help" · "what can you do" | "मदद" · "क्या कर सकते हो" |
 
 ---
 
@@ -142,7 +144,7 @@ npm run dev          # http://localhost:3000
 ```
 
 ```bash
-npm test             # 100 unit tests (Vitest)
+npm test             # 103 unit tests (Vitest)
 npm run typecheck    # tsc --noEmit
 npm run lint         # eslint
 npm run build        # production build

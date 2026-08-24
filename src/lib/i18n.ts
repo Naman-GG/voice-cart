@@ -36,6 +36,12 @@ export const T = {
   language: { en: "Language", hi: "भाषा" },
   voiceReplies: { en: "Voice replies", hi: "आवाज़ में जवाब" },
   history: { en: "Recent commands", hi: "हाल की कमांड" },
+  helpTitle: { en: "What you can say", hi: "आप क्या बोल सकते हैं" },
+  helpHint: {
+    en: "Tap any line to run it, or say it out loud.",
+    hi: "किसी भी लाइन को दबाएँ, या बोलकर आज़माएँ।",
+  },
+  close: { en: "Close", hi: "बंद करें" },
   tryTheseCommands: { en: "Try saying", hi: "ऐसे बोलें" },
   micUnsupported: {
     en: "This browser cannot record audio. Chrome, Edge or Safari work best — you can still type commands below.",
@@ -103,6 +109,25 @@ export const EXAMPLE_COMMANDS: Record<Lang, string[]> = {
     "टूथपेस्ट ढूंढो",
     "पाँच किलो चावल चाहिए",
     "लिस्ट में क्या है",
+  ],
+};
+
+/** Grouped command reference shown by the "help" command. */
+export const COMMAND_REFERENCE: Record<
+  Lang,
+  { group: string; examples: string[] }[]
+> = {
+  en: [
+    { group: "Add", examples: ["Add milk", "I need 2 kg apples", "Add bread and 6 eggs", "Buy 2 bottles of water"] },
+    { group: "Change", examples: ["Remove milk from my list", "Change milk to 3", "I bought the eggs", "Clear my list"] },
+    { group: "Find", examples: ["Find organic apples", "Find toothpaste under $5", "Show me juice between $2 and $4"] },
+    { group: "Ask", examples: ["What's on my list", "How much is milk", "Undo"] },
+  ],
+  hi: [
+    { group: "जोड़ें", examples: ["दूध जोड़ो", "मुझे दो किलो सेब चाहिए", "ब्रेड और छह अंडे जोड़ो", "दो बोतल पानी लेना है"] },
+    { group: "बदलें", examples: ["दूध हटा दो", "दूध तीन कर दो", "अंडे खरीद लिए", "पूरी लिस्ट हटाओ"] },
+    { group: "खोजें", examples: ["टूथपेस्ट ढूंढो", "चीनी की कीमत क्या है", "ऑर्गेनिक सेब ढूंढो"] },
+    { group: "पूछें", examples: ["लिस्ट में क्या है", "वापस करो"] },
   ],
 };
 

@@ -342,3 +342,22 @@ describe("Several items inside one clause", () => {
     expect(result.items[1]).toMatchObject({ quantity: 2, unit: "kg" });
   });
 });
+
+describe("Help", () => {
+  it("recognises a bare help request", () => {
+    for (const phrase of ["help", "Help.", "help me", "what can you do", "commands", "मदद", "मदद करो"]) {
+      expect(parse(phrase).intent, phrase).toBe("help");
+    }
+  });
+
+  it("does not hijack a command that merely contains the word help", () => {
+    // "help me add milk" used to be swallowed as a help request.
+    const add = parse("help me add milk");
+    expect(add.intent).toBe("add");
+    expect(add.items[0].productId).toBe("milk");
+
+    const buying = parse("I need help buying bread");
+    expect(buying.items.map((item) => item.productId)).toContain("bread");
+    expect(buying.intent).not.toBe("help");
+  });
+});

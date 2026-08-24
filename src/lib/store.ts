@@ -32,6 +32,8 @@ export interface AppState {
   hydrated: boolean;
   /** Clock reading taken at hydration; keeps suggestion ranking pure. */
   hydratedAt: number | null;
+  /** True while the command reference is on screen. */
+  helpOpen: boolean;
   items: ListItem[];
   history: HistoryEntry[];
   lang: Lang;
@@ -56,6 +58,7 @@ export type Action =
   | { type: "set-speak"; value: boolean }
   | { type: "search-results"; filters: SearchFilters; results: SearchResult[]; feedback: Feedback }
   | { type: "set-feedback"; feedback: Feedback }
+  | { type: "close-help" }
   | { type: "clear-search" }
   | { type: "dismiss-feedback" };
 
@@ -64,6 +67,7 @@ export const STORAGE_KEY = "voice-cart.state.v1";
 export const initialState: AppState = {
   hydrated: false,
   hydratedAt: null,
+  helpOpen: false,
   items: [],
   history: [],
   lang: "en",
@@ -402,6 +406,7 @@ export function reducer(state: AppState, action: Action): AppState {
         items: result.items,
         history: result.history,
         feedback: result.feedback,
+        helpOpen: action.command.intent === "help",
         search: result.search !== undefined ? result.search : state.search,
         past: mutates ? snapshot : state.past,
         log: [
@@ -502,6 +507,9 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case "set-feedback":
       return { ...state, feedback: action.feedback };
+
+    case "close-help":
+      return { ...state, helpOpen: false };
 
     case "clear-search":
       return { ...state, search: null };

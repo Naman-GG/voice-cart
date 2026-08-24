@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { CommandBar } from "@/components/CommandBar";
 import { FeedbackBanner } from "@/components/FeedbackBanner";
 import { Header } from "@/components/Header";
+import { HelpPanel } from "@/components/HelpPanel";
 import { IdleNudge } from "@/components/IdleNudge";
 import { VoiceControls } from "@/components/VoiceControls";
 import { SearchPanel } from "@/components/SearchPanel";
@@ -282,6 +283,17 @@ export default function Page() {
               lang={state.lang}
               onAccept={() => acceptNudge(nudge)}
               onDismiss={() => dismissNudge(nudge)}
+            />
+          )}
+
+          {state.helpOpen && (
+            <HelpPanel
+              lang={state.lang}
+              onRun={(command) => {
+                markActivity();
+                handleTranscript(command);
+              }}
+              onClose={() => dispatch({ type: "close-help" })}
             />
           )}
 

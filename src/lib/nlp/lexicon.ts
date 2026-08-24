@@ -67,8 +67,12 @@ export const UNIT_LABELS: Record<Unit, { en: string; hi: string }> = {
  */
 export const INTENT_PATTERNS: { intent: Intent; patterns: RegExp[] }[] = [
   {
+    // Anchored on purpose: "help me add milk" is an add, not a help request.
     intent: "help",
-    patterns: [/\b(help|what can (you|i) (do|say)|how does this work)\b/, /(मदद|क्या कर सकते हो)/],
+    patterns: [
+      /^(help|help me|i need help|need help|commands?|what can (you|i) (do|say)|what commands|how (does this work|do i use this)|examples?|instructions)$/,
+      /^(मदद|मदद करो|मदद चाहिए|क्या कर सकते हो|कैसे इस्तेमाल करें|कमांड)$/,
+    ],
   },
   {
     intent: "undo",
