@@ -174,3 +174,57 @@ export function seasonalHighlights(now = Date.now(), limit = 8): Product[] {
   const month = new Date(now).getMonth() + 1;
   return CATALOG.filter((product) => product.seasonMonths?.includes(month)).slice(0, limit);
 }
+
+/**
+ * Products this shopper buys most often, minus anything already on the list.
+ * Falls back to popular staples for a first-time user.
+ */
+export function frequentlyBought(list: ListItem[], history: HistoryEntry[], limit = 6): Product[] {
+  const onList = new Set(list.filter((item) => !item.checked).map((item) => item.productId));
+  const ranked = [...history]
+    .sort((a, b) => b.purchases - a.purchases || (b.addedAt.at(-1) ?? 0) - (a.addedAt.at(-1) ?? 0))
+    .map((entry) => getProduct(entry.productId))
+    .filter((product): product is Product => Boolean(product) && !onList.has(product!.id));
+
+  if (ranked.length >= limit) return ranked.slice(0, limit);
+
+  const fillers = STARTER_IDS.map((id) => getProduct(id)).filter(
+    (product): product is Product =>
+      Boolean(product) && !onList.has(product!.id) && !ranked.some((item) => item.id === product!.id),
+  );
+  return [...ranked, ...fillers].slice(0, limit);
+}
+
+/**
+ * Picks the single item to offer out loud after a stretch of silence.
+ * Prefers what the shopper usually buys, then anything else the recommender
+ * surfaced, and never repeats something already offered this session.
+ */
+export function nextIdleNudge(
+  list: ListItem[],
+  history: HistoryEntry[],
+  suggestions: Suggestion[],
+  alreadyOffered: ReadonlySet<string>,
+): Suggestion | null {
+  for (const product of frequentlyBought(list, history, 8)) {
+    if (alreadyOffered.has(product.id)) continue;
+    const seen = history.find((entry) => entry.productId === product.id);
+    return {
+      id: `idle:${product.id}`,
+      productId: product.id,
+      kind: "history",
+      reason: seen
+        ? {
+            en: `You usually buy ${product.name.en}. Want it on the list?`,
+            hi: `आप आमतौर पर ${product.name.hi} लेते हैं। लिस्ट में जोड़ूँ?`,
+          }
+        : {
+            en: `Most lists include ${product.name.en}. Want it on the list?`,
+            hi: `ज़्यादातर लिस्ट में ${product.name.hi} होता है। जोड़ूँ?`,
+          },
+      score: 0,
+    };
+  }
+
+  return suggestions.find((suggestion) => !alreadyOffered.has(suggestion.productId)) ?? null;
+}

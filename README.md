@@ -5,34 +5,56 @@ natural phrasing ("I need two litres of milk"), categorises items automatically,
 what you buy, and answers voice-driven product searches ("find toothpaste under $5").
 
 **Live demo:** _see the deployment URL in the project description_
-**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Web Speech API
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Whisper large-v3 (Groq)
 
 ---
 
-## Why it works without an API key
+## Setup
 
-Speech recognition runs **on-device** through the browser's Web Speech API, and intent
-parsing is a **deterministic rule-based NLP pipeline** written from scratch. There is no
-LLM in the request path, which means:
+Speech recognition uses **Whisper large-v3** hosted on Groq, so you need one free API key:
 
-- zero per-request cost and no API keys to provision,
-- replies in ~1 ms instead of ~1 s,
-- the parser is a pure function, so it is covered by **64 unit tests**,
-- the whole thing keeps working when the network drops.
+1. Create a key at [console.groq.com/keys](https://console.groq.com/keys).
+2. `cp .env.example .env.local` and paste the key into `GROQ_API_KEY`.
+3. `npm install && npm run dev`.
+
+Without the key the app still runs — the list, suggestions, search and the text command
+bar all work — but the microphone will report that recognition is not configured.
+
+---
+
+## How it is put together
+
+Two deliberately different halves:
+
+- **Recognition is a hosted model.** Whisper large-v3 handles accents, Hinglish
+  code-switching and noisy rooms far better than the browser's built-in recogniser, and
+  it is prompted with this app's own vocabulary (grocery nouns and command verbs) to
+  sharpen recall further.
+- **Understanding is local and deterministic.** Once there is a transcript, intent
+  parsing is a **rule-based NLP pipeline** written from scratch — no LLM in the loop.
+  That keeps interpretation free, instant, and covered by **72 unit tests**.
 
 ---
 
 ## Features
 
 ### 1. Voice input
-- **Push-to-talk** microphone with live interim transcription, plus a **hands-free mode** (`∞`)
-  that keeps the mic open across utterances.
+- **Whisper large-v3** transcription via Groq, prompted with the app's own grocery
+  vocabulary so terms like *atta*, *besan* and *shimla mirch* come back correctly.
+- **Hands-free voice activation** (`∞`). An analyser node watches the input level
+  against an adaptive noise floor: speech opens a clip, a second of silence closes it
+  and sends it for transcription. No tapping, no wake word.
+- **Barge-in protection** — the microphone is muted while the assistant is speaking,
+  plus a short grace period afterwards, so it never transcribes its own voice.
+- **Push-to-talk** as the alternative: tap the orb, speak, tap again. The mic is
+  released as soon as the clip is transcribed, so the browser's recording indicator
+  does not stay lit.
 - **Natural language understanding** — all of these mean the same thing:
   `Add milk` · `I need milk` · `I want to buy milk` · `grab some milk` · `milk`
-- **Multilingual**: English (`en-US`) and Hindi (`hi-IN`). Hindi is understood in
-  Devanagari (`दूध जोड़ो`) *and* in romanised Hinglish (`do kilo chawal chahiye`).
-  The whole UI, the spoken replies and the suggestion copy switch language too.
-- **Spoken replies** via speech synthesis, so the app is usable without looking at it.
+- **Multilingual**: English and Hindi. Hindi is understood in Devanagari
+  (`दूध जोड़ो`) *and* in romanised Hinglish (`do kilo chawal chahiye`). The whole UI,
+  the spoken replies and the suggestion copy switch language too.
+- **Spoken replies** via speech synthesis, with quality-ranked voice selection.
 - Keyboard shortcut: press <kbd>M</kbd> to toggle the microphone.
 
 ### 2. Smart suggestions
@@ -45,6 +67,11 @@ floods the rail:
 | **Seasonal** | "Carrots: in season right now." |
 | **Substitutes** | "Prefer an alternative to milk? Try almond milk." |
 | **Complements** | "Pasta sauce goes well with pasta." |
+
+**Proactive prompts.** In hands-free mode, ten seconds of silence makes the assistant
+offer something out loud — "You usually buy milk. Want it on the list?" — ranked by how
+often you actually buy it. Answer by voice (`yes` / `नहीं`) or by tapping the card. It
+never repeats an offer and stops after four prompts a session.
 
 Cadence is *learned*: if you actually buy rice every 4 days, that beats the catalog's
 30-day default. Items already on the list are never suggested.
@@ -100,16 +127,16 @@ npm run dev          # http://localhost:3000
 ```
 
 ```bash
-npm test             # 64 unit tests (Vitest)
+npm test             # 72 unit tests (Vitest)
 npm run typecheck    # tsc --noEmit
 npm run lint         # eslint
 npm run build        # production build
 ```
 
-> **Browser support:** the Web Speech API needs Chrome, Edge, or Safari 14.1+.
-> Firefox has no speech recognition — the app detects this and offers the text
-> command bar instead. Voice input requires HTTPS (or localhost) and microphone
-> permission.
+> **Browser support:** recognition needs `MediaRecorder` and `getUserMedia`, which
+> Chrome, Edge, Firefox and Safari 14.1+ all provide. Voice input requires HTTPS
+> (or localhost) and microphone permission; browsers without audio capture fall back
+> to the text command bar.
 
 ---
 
@@ -118,13 +145,15 @@ npm run build        # production build
 ```
 src/
 ├─ app/
-│  ├─ page.tsx              Orchestrates speech ⇄ parser ⇄ reducer ⇄ UI
-│  ├─ layout.tsx            Metadata, fonts, theme colours
-│  └─ api/search/route.ts   POST/GET catalog search endpoint
-├─ components/              MicButton, ShoppingList, SuggestionRail, SearchPanel, …
+│  ├─ page.tsx                  Orchestrates capture ⇄ parser ⇄ reducer ⇄ UI
+│  ├─ layout.tsx                Metadata, fonts, theme colours
+│  └─ api/
+│     ├─ search/route.ts        POST/GET catalog search endpoint
+│     └─ transcribe/route.ts    Whisper large-v3 on Groq
+├─ components/              MicButton, IdleNudge, ShoppingList, SuggestionRail, …
 ├─ hooks/
-│  ├─ useSpeechRecognition.ts   Web Speech API wrapper (prefixes, errors, restarts)
-│  └─ useSpeechSynthesis.ts     Spoken replies with voice selection
+│  ├─ useVoiceCapture.ts        Mic capture, voice-activity detection, transcription
+│  └─ useSpeechSynthesis.ts     Spoken replies with quality-ranked voice selection
 └─ lib/
    ├─ nlp/
    │  ├─ normalize.ts       Unicode/punctuation folding, singulariser, edit distance

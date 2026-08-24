@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCommand } from "@/lib/nlp/parser";
+import { matchConfirmation, parseCommand } from "@/lib/nlp/parser";
 
 const parse = (text: string, lang: "en" | "hi" = "en") => parseCommand(text, lang);
 
@@ -185,5 +185,25 @@ describe("Robustness", () => {
 
   it("reports low confidence when nothing is understood", () => {
     expect(parse("asdkjhasd qwerty").confidence).toBeLessThan(0.7);
+  });
+});
+
+describe("Confirmation replies", () => {
+  it("recognises affirmatives in both languages", () => {
+    for (const phrase of ["yes", "yeah", "sure", "ok", "add it", "हाँ", "जी हाँ", "ठीक है"]) {
+      expect(matchConfirmation(phrase), phrase).toBe("yes");
+    }
+  });
+
+  it("recognises negatives in both languages", () => {
+    for (const phrase of ["no", "nope", "not now", "skip", "नहीं", "अभी नहीं", "रहने दो"]) {
+      expect(matchConfirmation(phrase), phrase).toBe("no");
+    }
+  });
+
+  it("ignores anything that is a real command", () => {
+    expect(matchConfirmation("add two litres of milk")).toBeNull();
+    expect(matchConfirmation("find toothpaste under $5")).toBeNull();
+    expect(matchConfirmation("")).toBeNull();
   });
 });

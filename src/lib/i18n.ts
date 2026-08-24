@@ -38,15 +38,39 @@ export const T = {
   history: { en: "Recent commands", hi: "हाल की कमांड" },
   tryTheseCommands: { en: "Try saying", hi: "ऐसे बोलें" },
   micUnsupported: {
-    en: "Voice input is not supported in this browser. Chrome or Edge on desktop and Android work best — you can still type commands below.",
-    hi: "इस ब्राउज़र में वॉइस इनपुट उपलब्ध नहीं है। Chrome या Edge आज़माएँ — आप नीचे टाइप भी कर सकते हैं।",
+    en: "This browser cannot record audio. Chrome, Edge or Safari work best — you can still type commands below.",
+    hi: "यह ब्राउज़र ऑडियो रिकॉर्ड नहीं कर सकता। Chrome, Edge या Safari आज़माएँ — आप नीचे टाइप भी कर सकते हैं।",
   },
   micDenied: {
     en: "Microphone access was blocked. Enable it in your browser settings to use voice.",
     hi: "माइक्रोफ़ोन की अनुमति नहीं मिली। ब्राउज़र सेटिंग में इसे चालू करें।",
   },
-  micError: { en: "Could not hear anything. Please try again.", hi: "कुछ सुनाई नहीं दिया। दोबारा कोशिश करें।" },
+  micError: { en: "Could not reach the microphone. Please try again.", hi: "माइक्रोफ़ोन नहीं मिला। दोबारा कोशिश करें।" },
   noSpeech: { en: "I didn't catch that — try again.", hi: "समझ नहीं आया — फिर से बोलिए।" },
+  transcribeFailed: {
+    en: "Transcription failed. Check your connection and try again.",
+    hi: "ट्रांसक्रिप्शन विफल रहा। कनेक्शन जाँचें और फिर कोशिश करें।",
+  },
+  transcribeUnconfigured: {
+    en: "Speech recognition isn't configured. Add GROQ_API_KEY to .env.local and restart the server.",
+    hi: "स्पीच पहचान सेट नहीं है। .env.local में GROQ_API_KEY जोड़कर सर्वर दोबारा शुरू करें।",
+  },
+
+  // Live capture states
+  statusIdle: { en: "Tap to speak", hi: "बोलने के लिए दबाएँ" },
+  statusListening: { en: "Listening — just start talking", hi: "सुन रहे हैं — बस बोलिए" },
+  statusRecording: { en: "Recording…", hi: "रिकॉर्ड हो रहा है…" },
+  statusTranscribing: { en: "Transcribing with Whisper…", hi: "व्हिस्पर से समझ रहे हैं…" },
+  statusSpeaking: { en: "Speaking…", hi: "बोल रहे हैं…" },
+  handsFree: { en: "Hands-free", hi: "हैंड्स-फ़्री" },
+  handsFreeHint: {
+    en: "Hands-free is on — speak any time, no tapping needed.",
+    hi: "हैंड्स-फ़्री चालू है — कभी भी बोलिए, दबाने की ज़रूरत नहीं।",
+  },
+  poweredBy: { en: "Whisper large-v3", hi: "व्हिस्पर large-v3" },
+  usuallyBuy: { en: "You usually buy", hi: "आप आमतौर पर लेते हैं" },
+  addIt: { en: "Yes, add it", hi: "हाँ, जोड़ें" },
+  notNow: { en: "Not now", hi: "अभी नहीं" },
 } satisfies Record<string, Dict>;
 
 export type TranslationKey = keyof typeof T;

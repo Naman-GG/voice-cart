@@ -269,3 +269,25 @@ export function parseCommand(transcript: string, defaultLang: Lang = "en"): Pars
 
   return { intent, lang, transcript, items, filters, confidence };
 }
+
+const AFFIRMATIVE = [
+  /\b(yes|yeah|yep|yup|sure|okay|ok|please do|go ahead|add it|do it|of course)\b/,
+  /(हाँ|हां|जी हाँ|जी|ठीक है|बिल्कुल|जोड़ दो|कर दो|हा)/,
+];
+const NEGATIVE = [
+  /\b(no|nope|nah|not now|skip|later|never ?mind|dont|do not)\b/,
+  /(नहीं|नही|ना|अभी नहीं|रहने दो|मत)/,
+];
+
+/**
+ * Detects a bare yes/no reply, used when the assistant has just asked
+ * whether to add something. Returns null for anything else so the
+ * utterance falls through to the normal command parser.
+ */
+export function matchConfirmation(transcript: string): "yes" | "no" | null {
+  const text = normalize(transcript);
+  if (!text || text.split(" ").length > 4) return null;
+  if (NEGATIVE.some((pattern) => pattern.test(text))) return "no";
+  if (AFFIRMATIVE.some((pattern) => pattern.test(text))) return "yes";
+  return null;
+}

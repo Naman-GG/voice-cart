@@ -4,49 +4,69 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { CommandBar } from "@/components/CommandBar";
 import { FeedbackBanner } from "@/components/FeedbackBanner";
 import { Header } from "@/components/Header";
+import { IdleNudge } from "@/components/IdleNudge";
 import { MicButton } from "@/components/MicButton";
 import { SearchPanel } from "@/components/SearchPanel";
+import { ShoppingList } from "@/components/ShoppingList";
 import { SuggestionRail } from "@/components/SuggestionRail";
-import { useSpeechRecognition, type RecognitionErrorCode } from "@/hooks/useSpeechRecognition";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { useVoiceCapture, type CaptureErrorCode } from "@/hooks/useVoiceCapture";
 import { LANGUAGES, T } from "@/lib/i18n";
-import { parseCommand } from "@/lib/nlp/parser";
+import { matchConfirmation, parseCommand } from "@/lib/nlp/parser";
 import { searchCatalog } from "@/lib/search";
 import { searchFeedback } from "@/lib/search-feedback";
-import { ShoppingList } from "@/components/ShoppingList";
-import { buildSuggestions } from "@/lib/suggestions";
-import {
-  initialState,
-  loadPersisted,
-  persist,
-  reducer,
-  type Feedback,
-} from "@/lib/store";
-import type { SearchFilters, SearchResult } from "@/lib/types";
+import { buildSuggestions, nextIdleNudge } from "@/lib/suggestions";
+import { initialState, loadPersisted, persist, reducer, type Feedback } from "@/lib/store";
+import type { SearchFilters, SearchResult, Suggestion } from "@/lib/types";
 
-const ERROR_FEEDBACK: Record<RecognitionErrorCode, keyof typeof T> = {
+/** Silence before the assistant offers something out loud. */
+const IDLE_PROMPT_MS = 10_000;
+/** Never nag more than this many times in one session. */
+const MAX_IDLE_PROMPTS = 4;
+
+const ERROR_FEEDBACK: Record<CaptureErrorCode, keyof typeof T> = {
   unsupported: "micUnsupported",
   denied: "micDenied",
-  "no-speech": "noSpeech",
-  audio: "micError",
-  network: "micError",
-  unknown: "micError",
+  "no-audio": "micError",
+  empty: "noSpeech",
+  config: "transcribeUnconfigured",
+  network: "transcribeFailed",
+  unknown: "transcribeFailed",
 };
 
 export default function Page() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [handsFree, setHandsFree] = useState(false);
+  const [nudge, setNudge] = useState<Suggestion | null>(null);
+
   const searchToken = useRef(0);
+  const lastActivityRef = useRef(0);
+  const offeredRef = useRef<Set<string>>(new Set());
+  const promptCountRef = useRef(0);
+  const nudgeRef = useRef<Suggestion | null>(null);
+
   const hydrated = state.hydrated;
-  // Captured once at hydration so suggestion ranking stays render-pure.
   const now = state.hydratedAt;
-
   const speechCode = LANGUAGES.find((option) => option.code === state.lang)?.speechCode ?? "en-US";
-  const { speak, cancel } = useSpeechSynthesis(speechCode, state.speakReplies);
+  const { speak, cancel, speaking } = useSpeechSynthesis(speechCode, state.speakReplies);
 
-  // Restore the saved list before the first paint of real content.
+  const suggestions = useMemo(
+    () => (now === null ? [] : buildSuggestions({ list: state.items, history: state.history, now })),
+    [now, state.history, state.items],
+  );
+
+  // Mirrored into a ref so callbacks can read it without re-subscribing.
+  useEffect(() => {
+    nudgeRef.current = nudge;
+  }, [nudge]);
+
+  const markActivity = useCallback(() => {
+    lastActivityRef.current = Date.now();
+  }, []);
+
   useEffect(() => {
     dispatch({ type: "hydrate", payload: { ...loadPersisted(), hydratedAt: Date.now() } });
+    lastActivityRef.current = Date.now();
   }, []);
 
   useEffect(() => {
@@ -64,52 +84,86 @@ export default function Page() {
       if (!response.ok) throw new Error(`Search failed with ${response.status}`);
       const data = (await response.json()) as { results: SearchResult[] };
       if (token !== searchToken.current) return;
-      dispatch({
-        type: "search-results",
-        filters,
-        results: data.results,
-        feedback: searchFeedback(filters, data.results, false),
-      });
+      dispatch({ type: "search-results", filters, results: data.results, feedback: searchFeedback(filters, data.results, false) });
     } catch (error) {
       // The catalog also lives client-side, so search still works offline.
       console.warn("Falling back to local search", error);
       if (token !== searchToken.current) return;
       const results = searchCatalog(filters);
-      dispatch({
-        type: "search-results",
-        filters,
-        results,
-        feedback: searchFeedback(filters, results, true),
-      });
+      dispatch({ type: "search-results", filters, results, feedback: searchFeedback(filters, results, true) });
     }
   }, []);
 
+  const acceptNudge = useCallback(
+    (accepted: Suggestion) => {
+      offeredRef.current.add(accepted.productId);
+      setNudge(null);
+      markActivity();
+      dispatch({ type: "add-product", productId: accepted.productId, at: Date.now() });
+    },
+    [markActivity],
+  );
+
+  const dismissNudge = useCallback(
+    (accepted: Suggestion) => {
+      offeredRef.current.add(accepted.productId);
+      setNudge(null);
+      markActivity();
+    },
+    [markActivity],
+  );
+
   const handleTranscript = useCallback(
     (transcript: string) => {
+      markActivity();
+
+      // A bare "yes"/"no" answers the assistant's own question.
+      const pending = nudgeRef.current;
+      if (pending) {
+        const answer = matchConfirmation(transcript);
+        if (answer === "yes") {
+          acceptNudge(pending);
+          return;
+        }
+        if (answer === "no") {
+          dismissNudge(pending);
+          return;
+        }
+        setNudge(null);
+      }
+
       const command = parseCommand(transcript, state.lang);
       dispatch({ type: "command", command, at: Date.now() });
       if (command.intent === "search" && command.filters) void runSearch(command.filters);
     },
-    [runSearch, state.lang],
+    [acceptNudge, dismissNudge, markActivity, runSearch, state.lang],
   );
 
-  const handleRecognitionError = useCallback(
-    (code: RecognitionErrorCode) => {
-      const key = ERROR_FEEDBACK[code];
+  const handleCaptureError = useCallback(
+    (code: CaptureErrorCode, message?: string) => {
+      markActivity();
+      const fallback = T[ERROR_FEEDBACK[code]];
       const feedback: Feedback = {
-        tone: code === "no-speech" ? "warning" : "error",
-        message: T[key],
+        tone: code === "empty" ? "warning" : "error",
+        // Prefer the server's specific reason when it sent one.
+        message: message && code !== "empty" ? { en: message, hi: message } : fallback,
       };
       dispatch({ type: "set-feedback", feedback });
+      if (code === "denied" || code === "config" || code === "unsupported") {
+        setHandsFree(false);
+        setNudge(null);
+      }
     },
-    [],
+    [markActivity],
   );
 
-  const { supported, listening, interim, toggle, stop } = useSpeechRecognition({
-    lang: speechCode,
+  const capture = useVoiceCapture({
+    lang: state.lang,
     handsFree,
-    onResult: handleTranscript,
-    onError: handleRecognitionError,
+    muted: speaking,
+    onTranscript: handleTranscript,
+    onError: handleCaptureError,
+    onSpeechStart: markActivity,
   });
 
   // Speak every reply except the transient "…" progress messages.
@@ -125,6 +179,28 @@ export default function Page() {
 
   useEffect(() => () => cancel(), [cancel]);
 
+  // After a stretch of silence, offer something the shopper usually buys.
+  useEffect(() => {
+    if (!handsFree || !hydrated) return;
+    const timer = setInterval(() => {
+      if (speaking || nudgeRef.current) return;
+      if (capture.status !== "listening") return;
+      if (promptCountRef.current >= MAX_IDLE_PROMPTS) return;
+      if (Date.now() - lastActivityRef.current < IDLE_PROMPT_MS) return;
+
+      const offer = nextIdleNudge(state.items, state.history, suggestions, offeredRef.current);
+      if (!offer) {
+        promptCountRef.current = MAX_IDLE_PROMPTS;
+        return;
+      }
+      promptCountRef.current += 1;
+      lastActivityRef.current = Date.now();
+      setNudge(offer);
+      speak(offer.reason[state.lang]);
+    }, 1_000);
+    return () => clearInterval(timer);
+  }, [capture.status, handsFree, hydrated, speak, speaking, state.history, state.items, state.lang, suggestions]);
+
   // "m" anywhere outside a text field toggles the microphone.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -132,15 +208,19 @@ export default function Page() {
       if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
       if (event.key.toLowerCase() !== "m" || event.metaKey || event.ctrlKey) return;
       event.preventDefault();
-      toggle();
+      markActivity();
+      capture.toggle();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [toggle]);
+  }, [capture, markActivity]);
 
-  const suggestions = useMemo(
-    () => (now === null ? [] : buildSuggestions({ list: state.items, history: state.history, now })),
-    [now, state.history, state.items],
+  const addProduct = useCallback(
+    (productId: string) => {
+      markActivity();
+      dispatch({ type: "add-product", productId, at: Date.now() });
+    },
+    [markActivity],
   );
 
   return (
@@ -149,30 +229,48 @@ export default function Page() {
         lang={state.lang}
         speakReplies={state.speakReplies}
         handsFree={handsFree}
-        onLangChange={(lang) => {
-          stop();
-          dispatch({ type: "set-lang", lang });
-        }}
+        onLangChange={(lang) => dispatch({ type: "set-lang", lang })}
         onSpeakChange={(value) => dispatch({ type: "set-speak", value })}
-        onHandsFreeChange={setHandsFree}
+        onHandsFreeChange={(value) => {
+          markActivity();
+          // Re-arming hands-free refreshes the nag budget for a new session.
+          promptCountRef.current = 0;
+          if (!value) setNudge(null);
+          setHandsFree(value);
+        }}
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
         <div className="flex min-w-0 flex-col gap-5">
           <section className="rounded-3xl border border-line bg-surface px-5 py-7 shadow-[var(--shadow)]">
             <MicButton
-              listening={listening}
-              disabled={!supported}
+              status={capture.status}
+              speaking={speaking}
+              level={capture.level}
+              handsFree={handsFree}
+              supported={capture.supported}
               lang={state.lang}
-              interim={interim}
-              onToggle={toggle}
+              lastTranscript={state.log[0]?.transcript ?? null}
+              onToggle={() => {
+                markActivity();
+                capture.toggle();
+              }}
             />
-            {!supported && hydrated && (
+            {!capture.supported && hydrated && (
               <p className="mx-auto mt-4 max-w-sm text-center text-xs leading-relaxed text-text-muted">
                 {T.micUnsupported[state.lang]}
               </p>
             )}
           </section>
+
+          {nudge && (
+            <IdleNudge
+              nudge={nudge}
+              lang={state.lang}
+              onAccept={() => acceptNudge(nudge)}
+              onDismiss={() => dismissNudge(nudge)}
+            />
+          )}
 
           <FeedbackBanner
             feedback={state.feedback}
@@ -180,7 +278,13 @@ export default function Page() {
             onDismiss={() => dispatch({ type: "dismiss-feedback" })}
           />
 
-          <CommandBar lang={state.lang} onSubmit={handleTranscript} />
+          <CommandBar
+            lang={state.lang}
+            onSubmit={(text) => {
+              markActivity();
+              handleTranscript(text);
+            }}
+          />
 
           {hydrated ? (
             <ShoppingList
@@ -190,7 +294,7 @@ export default function Page() {
               onToggle={(rowId) => dispatch({ type: "toggle-row", rowId })}
               onRemove={(rowId) => dispatch({ type: "remove-row", rowId })}
               onQuantity={(rowId, delta) => dispatch({ type: "change-quantity", rowId, delta })}
-              onAddProduct={(productId) => dispatch({ type: "add-product", productId, at: Date.now() })}
+              onAddProduct={addProduct}
               onClear={() => dispatch({ type: "clear" })}
               onUndo={() => dispatch({ type: "undo" })}
             />
@@ -200,28 +304,23 @@ export default function Page() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
-          {state.search && (
-            state.search.loading ? (
+          {state.search &&
+            (state.search.loading ? (
               <SearchSkeleton label={T.searchResults[state.lang]} />
             ) : (
               <SearchPanel
                 filters={state.search.filters}
                 results={state.search.results}
                 lang={state.lang}
-                onAdd={(productId) => dispatch({ type: "add-product", productId, at: Date.now() })}
+                onAdd={addProduct}
                 onClose={() => dispatch({ type: "clear-search" })}
               />
-            )
-          )}
+            ))}
 
-          <SuggestionRail
-            suggestions={suggestions}
-            lang={state.lang}
-            onAdd={(productId) => dispatch({ type: "add-product", productId, at: Date.now() })}
-          />
+          <SuggestionRail suggestions={suggestions} lang={state.lang} onAdd={addProduct} />
 
           {state.log.length > 0 && (
-            <section aria-label={T.history[state.lang]} className="space-y-2">
+            <section aria-label={T.history[state.lang]} className="min-w-0 space-y-2">
               <h2 className="px-1 text-sm font-semibold">{T.history[state.lang]}</h2>
               <ul className="scrollbar-thin max-h-56 space-y-1.5 overflow-y-auto rounded-2xl border border-line bg-surface p-3">
                 {state.log.map((entry) => (
@@ -245,7 +344,8 @@ export default function Page() {
       </div>
 
       <footer className="pb-2 pt-4 text-center text-[11px] text-text-muted">
-        Voice recognition runs on-device via the Web Speech API. Press <kbd className="rounded border border-line px-1">M</kbd> to toggle the mic.
+        Speech recognised by Whisper large-v3 on Groq. Press{" "}
+        <kbd className="rounded border border-line px-1">M</kbd> to toggle the mic.
       </footer>
     </main>
   );

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildSuggestions, seasonalHighlights, substitutesFor } from "@/lib/suggestions";
+import {
+  buildSuggestions,
+  frequentlyBought,
+  nextIdleNudge,
+  seasonalHighlights,
+  substitutesFor,
+} from "@/lib/suggestions";
 import type { HistoryEntry, ListItem } from "@/lib/types";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -92,5 +98,44 @@ describe("smart suggestions", () => {
     // Catalog cadence for rice is 30 days, but this shopper buys it every 4.
     const suggestions = buildSuggestions({ list: [], history, now: NOW, limit: 40 });
     expect(suggestions.some((entry) => entry.productId === "rice" && entry.kind === "history")).toBe(true);
+  });
+});
+
+describe("proactive idle prompts", () => {
+  const history: HistoryEntry[] = [
+    { productId: "milk", addedAt: [NOW - 5 * DAY], purchases: 9 },
+    { productId: "bread", addedAt: [NOW - 6 * DAY], purchases: 4 },
+  ];
+
+  it("ranks the shopper's most frequent purchases first", () => {
+    expect(frequentlyBought([], history).map((product) => product.id).slice(0, 2)).toEqual(["milk", "bread"]);
+  });
+
+  it("skips items already on the list", () => {
+    const ids = frequentlyBought([listItem("milk")], history).map((product) => product.id);
+    expect(ids).not.toContain("milk");
+    expect(ids[0]).toBe("bread");
+  });
+
+  it("falls back to staples for a first-time shopper", () => {
+    expect(frequentlyBought([], []).length).toBeGreaterThan(0);
+  });
+
+  it("offers the most frequent item first, then never repeats it", () => {
+    const offered = new Set<string>();
+    const first = nextIdleNudge([], history, [], offered);
+    expect(first?.productId).toBe("milk");
+    expect(first?.reason.en).toMatch(/usually buy/i);
+
+    offered.add(first!.productId);
+    const second = nextIdleNudge([], history, [], offered);
+    expect(second?.productId).toBe("bread");
+  });
+
+  it("falls back to the recommender once frequent items run out", () => {
+    const offered = new Set(frequentlyBought([], []).map((product) => product.id));
+    const suggestions = buildSuggestions({ list: [], history: [], now: NOW, limit: 40 });
+    const nudge = nextIdleNudge([], [], suggestions, offered);
+    expect(nudge === null || !offered.has(nudge.productId)).toBe(true);
   });
 });

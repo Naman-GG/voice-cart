@@ -57,8 +57,8 @@ export function Header({
         <Toggle
           active={handsFree}
           onClick={() => onHandsFreeChange(!handsFree)}
-          label="Hands-free"
-          title={lang === "hi" ? "बिना हाथ लगाए सुनते रहें" : "Keep the mic open"}
+          label={T.handsFree[lang]}
+          title={T.handsFreeHint[lang]}
         >
           ∞
         </Toggle>
