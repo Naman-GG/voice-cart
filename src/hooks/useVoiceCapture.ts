@@ -44,7 +44,27 @@ const SPEECH_ONSET_MS = 70; // sustained loudness before a clip opens
 const SILENCE_TO_CLOSE = 700;
 const MIN_CLIP = 250;
 const MAX_CLIP = 20_000;
-const FLOOR_ATTACK = 0.02; // how fast the noise floor adapts
+/*
+ * Noise-floor follower.
+ *
+ * Averaging every sample made the floor track the room's mean, and
+ * multiplying that by three put the threshold around 0.28 — above ordinary
+ * speech, so nothing ever triggered. Chasing the minimum instead swings too
+ * far the other way and fires on room tone.
+ *
+ * So: the floor follows the mean of the *quiet* samples only. Anything
+ * already above the threshold is speech and is excluded, which keeps the
+ * floor honest in a noisy room without letting speech inflate it.
+ */
+const FLOOR_ADAPT = 0.05;
+/** Faster while warming up, so the first estimate lands quickly. */
+const FLOOR_ADAPT_WARMUP = 0.2;
+const THRESHOLD_GAIN = 1.5;
+const THRESHOLD_MARGIN = 0.035;
+/** Hard ceiling: the bar can never rise above ordinary speech. */
+const MAX_THRESHOLD = 0.18;
+/** Close a tap-to-talk clip that never hears anything. */
+const NO_SPEECH_LEAD_IN = 8_000;
 /**
  * Sustained sound a clip needs before it is worth uploading. A door click or
  * keyboard tap has a high peak but almost no duration, so peak alone lets
@@ -131,7 +151,7 @@ export function useVoiceCapture({
   const silenceSinceRef = useRef<number | null>(null);
   const loudRunMsRef = useRef(0);
   const lastSampleAtRef = useRef(0);
-  const noiseFloorRef = useRef(0.01);
+  const noiseFloorRef = useRef(0.04);
   /** Loudest level seen during the current clip. */
   const clipPeakRef = useRef(0);
   /** Accumulated milliseconds above threshold during the current clip. */
@@ -155,6 +175,16 @@ export function useVoiceCapture({
    * Resting status. A warm-but-unarmed session still reads as "off" to the
    * user, because nothing will be recorded until they tap.
    */
+  /** Current speech threshold, from the adaptive floor. */
+  const thresholdNow = useCallback(
+    () =>
+      Math.min(
+        MAX_THRESHOLD,
+        Math.max(MIN_THRESHOLD, noiseFloorRef.current * THRESHOLD_GAIN + THRESHOLD_MARGIN),
+      ),
+    [],
+  );
+
   const restStatus = useCallback((): CaptureStatus => (vadRef.current ? "listening" : "off"), []);
 
   // Keep a grace period after the assistant stops talking so the tail of its
@@ -274,8 +304,7 @@ export function useVoiceCapture({
       // A clip that never rose above the noise floor, or that only spiked
       // briefly, is noise rather than speech. Dropping it here saves a round
       // trip and avoids Whisper hallucinating on it.
-      const threshold = Math.max(MIN_THRESHOLD, noiseFloorRef.current * 3 + 0.01);
-      const silent = clipPeakRef.current < threshold;
+      const silent = clipPeakRef.current < thresholdNow();
       const tooBrief = clipLoudMsRef.current < MIN_LOUD_MS;
       const drop = discard || tooShort || silent || tooBrief;
 
@@ -301,7 +330,7 @@ export function useVoiceCapture({
         setStatus(restStatus());
       }
     },
-    [restStatus, scheduleRelease, transcribe],
+    [restStatus, scheduleRelease, thresholdNow, transcribe],
   );
 
   const beginClip = useCallback(() => {
@@ -343,7 +372,9 @@ export function useVoiceCapture({
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          // Auto gain floats the input level, which a level-based detector
+          // cannot track; the other two only help.
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false },
         });
       } catch (error) {
         const denied =
@@ -425,8 +456,7 @@ export function useVoiceCapture({
           return;
         }
 
-        const threshold = Math.max(MIN_THRESHOLD, noiseFloorRef.current * 3 + 0.01);
-        const loud = scaled > threshold;
+        const loud = scaled > thresholdNow();
 
         if (recordingRef.current) {
           if (scaled > clipPeakRef.current) clipPeakRef.current = scaled;
@@ -436,9 +466,14 @@ export function useVoiceCapture({
             finishClip();
             return;
           }
-          if (!vadRef.current) return;
           if (loud) {
             silenceSinceRef.current = null;
+            return;
+          }
+          // Nothing said yet: this is the pause after tapping, not the end of
+          // a sentence. Give up only if the whole clip stays silent.
+          if (clipLoudMsRef.current < MIN_LOUD_MS) {
+            if (now - startedAtRef.current > NO_SPEECH_LEAD_IN) finishClip(true);
             return;
           }
           if (silenceSinceRef.current === null) silenceSinceRef.current = now;
@@ -446,8 +481,12 @@ export function useVoiceCapture({
           return;
         }
 
-        // Track the room's noise floor only while nobody is talking.
-        noiseFloorRef.current += (scaled - noiseFloorRef.current) * FLOOR_ATTACK;
+        // Quiet samples only: speech must never raise its own bar.
+        const floor = noiseFloorRef.current;
+        if (scaled < thresholdNow()) {
+          const warming = now < vadReadyAtRef.current;
+          noiseFloorRef.current += (scaled - floor) * (warming ? FLOOR_ADAPT_WARMUP : FLOOR_ADAPT);
+        }
         if (!vadRef.current) return;
 
         if (inflightRef.current === 0 && now - lastSpeechAtRef.current > IDLE_MIC_TIMEOUT) {
@@ -478,7 +517,7 @@ export function useVoiceCapture({
     const ok = await opening;
     if (!ok) openRef.current = null;
     return ok;
-  }, [beginClip, finishClip, restStatus, supported, teardown]);
+  }, [beginClip, finishClip, restStatus, supported, teardown, thresholdNow]);
 
   /** Tap: close an open clip, otherwise open the session and start one. */
   const toggle = useCallback(() => {

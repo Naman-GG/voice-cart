@@ -50,9 +50,10 @@ Two deliberately different halves:
   thread precisely because `requestAnimationFrame` is suspended in a hidden tab.
 - **Barge-in protection** — the microphone is muted while the assistant is speaking,
   plus a short grace period afterwards, so it never transcribes its own voice.
-- **Push-to-talk** as the alternative: tap the orb, speak, tap again. The mic is
-  released as soon as the clip is transcribed, so the browser's recording indicator
-  does not stay lit.
+- **Push-to-talk** as the alternative: tap once, speak, and stop. It closes on its
+  own when you pause — no second tap — and gives up after eight seconds of silence.
+  The mic is released once the clip is transcribed, so the browser's recording
+  indicator does not stay lit.
 - **Natural language understanding** — all of these mean the same thing:
   `Add milk` · `I need milk` · `I want to buy milk` · `grab some milk` · `milk`
 - **Multilingual**: English and Hindi. Hindi is understood in Devanagari

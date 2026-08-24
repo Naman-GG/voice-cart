@@ -69,7 +69,7 @@ export const T = {
   statusIdle: { en: "Tap to speak", hi: "बोलने के लिए दबाएँ" },
   statusOpening: { en: "Starting the microphone…", hi: "माइक्रोफ़ोन शुरू हो रहा है…" },
   statusListening: { en: "Listening — just start talking", hi: "सुन रहे हैं — बस बोलिए" },
-  statusRecording: { en: "Recording…", hi: "रिकॉर्ड हो रहा है…" },
+  statusRecording: { en: "Listening — pause when you're done", hi: "सुन रहे हैं — बोलकर रुक जाइए" },
   statusTranscribing: { en: "Transcribing with Whisper…", hi: "व्हिस्पर से समझ रहे हैं…" },
   statusSpeaking: { en: "Speaking…", hi: "बोल रहे हैं…" },
   handsFree: { en: "Hands-free", hi: "हैंड्स-फ़्री" },
