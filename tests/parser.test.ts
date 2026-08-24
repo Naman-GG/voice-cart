@@ -207,3 +207,32 @@ describe("Confirmation replies", () => {
     expect(matchConfirmation("")).toBeNull();
   });
 });
+
+/**
+ * Whisper formats text differently from a browser recogniser: it writes
+ * digits, adds sentence punctuation and capitalises. These are verbatim
+ * transcripts captured from the /api/transcribe endpoint.
+ */
+describe("Real Whisper large-v3 transcripts", () => {
+  it("parses an English multi-item add", () => {
+    const result = parse("Add 2 liters of milk and 6 eggs to my list.");
+    expect(result.intent).toBe("add");
+    expect(result.items.map((item) => item.productId)).toEqual(["milk", "eggs"]);
+    expect(result.items[0]).toMatchObject({ quantity: 2, unit: "l" });
+    expect(result.items[1]).toMatchObject({ quantity: 6 });
+  });
+
+  it("parses a search with a dollar amount", () => {
+    const result = parse("Find toothpaste under $5.");
+    expect(result.intent).toBe("search");
+    expect(result.filters?.maxPrice).toBe(5);
+    expect(result.filters?.query.toLowerCase()).toContain("toothpaste");
+  });
+
+  it("parses Hindi with a trailing danda", () => {
+    const result = parse("मुझे दो किलो चावल और प्याज चाहिए।", "hi");
+    expect(result.intent).toBe("add");
+    expect(result.items.map((item) => item.productId)).toEqual(["rice", "onion"]);
+    expect(result.items[0]).toMatchObject({ quantity: 2, unit: "kg" });
+  });
+});
