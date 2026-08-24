@@ -1,11 +1,18 @@
 # Voice Cart — Voice Command Shopping Assistant
 
+### ▶ [voice-shop-list.vercel.app](https://voice-shop-list.vercel.app/)
+
 Build a shopping list by *talking* to it, in **English or Hindi**. Voice Cart understands
 natural phrasing ("I need two litres of milk"), categorises items automatically, remembers
 what you buy, and answers voice-driven product searches ("find toothpaste under $5").
 
-**Live demo:** _see the deployment URL in the project description_
+![Voice Cart: a ruled paper list with the microphone above it and smart suggestions beside it](docs/screenshot.png)
+
 **Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Whisper large-v3 (Groq)
+
+> Allow microphone access when the browser asks. Tap the mic and speak, or switch on
+> hands-free (`∞`) and just talk. Everything also works by typing, if you would rather read
+> than speak.
 
 ---
 
@@ -16,6 +23,11 @@ Speech recognition uses **Whisper large-v3** hosted on Groq, so you need one fre
 1. Create a key at [console.groq.com/keys](https://console.groq.com/keys).
 2. `cp .env.example .env.local` and paste the key into `GROQ_API_KEY`.
 3. `npm install && npm run dev`.
+
+Deploying: add `GROQ_API_KEY` as an environment variable on the host. It is read only
+inside the route handler and carries no `NEXT_PUBLIC_` prefix, so it never reaches the
+browser bundle. On Vercel, set it for Preview as well as Production, or previews will
+report that recognition is not configured while production works.
 
 Without the key the app still runs — the list, suggestions, search and the text command
 bar all work — but the microphone will report that recognition is not configured.
@@ -231,9 +243,9 @@ src/
 ## API
 
 ```bash
-curl "https://<your-deployment>/api/search?q=toothpaste&maxPrice=5"
+curl "https://voice-shop-list.vercel.app/api/search?q=toothpaste&maxPrice=5"
 
-curl -X POST https://<your-deployment>/api/search \
+curl -X POST https://voice-shop-list.vercel.app/api/search \
   -H 'Content-Type: application/json' \
   -d '{"filters":{"query":"apples","organicOnly":true},"limit":5}'
 ```
