@@ -17,9 +17,6 @@ interface Props {
   onHandsFreeToggle: () => void;
 }
 
-/** Per-bar multipliers give the waveform a natural centre-weighted shape. */
-const BAR_WEIGHTS = [0.45, 0.78, 1, 0.78, 0.45];
-
 type Visual = "idle" | "opening" | "listening" | "recording" | "transcribing" | "speaking";
 
 function resolveVisual(status: CaptureStatus, speaking: boolean): Visual {
@@ -42,21 +39,12 @@ const LABEL_KEYS: Record<Visual, keyof typeof T> = {
   speaking: "statusSpeaking",
 };
 
-const ORB_STYLES: Record<Visual, string> = {
-  idle: "bg-accent text-[color:var(--accent-contrast)]",
-  opening: "bg-accent/70 text-[color:var(--accent-contrast)]",
-  listening: "bg-accent text-[color:var(--accent-contrast)]",
-  recording: "bg-danger text-white",
-  transcribing: "bg-warning text-white",
-  speaking: "bg-accent-soft text-text ring-2 ring-accent",
-};
-
 /**
- * The two voice controls, side by side.
+ * The two voice controls. Activating either collapses the other, so whichever
+ * mode is running always has one obvious off switch.
  *
- * Activating either one collapses the other, so the active mode always has a
- * single obvious off switch — previously hands-free could only be stopped
- * from a small toggle in the header.
+ * The level meter is drawn as a pen stroke travelling across a ruled line —
+ * the same gesture that strikes an item off the list.
  */
 export function VoiceControls({
   status,
@@ -70,92 +58,78 @@ export function VoiceControls({
   onHandsFreeToggle,
 }: Props) {
   const visual = resolveVisual(status, speaking);
-  // Push-to-talk is mid-command: hide the hands-free control until it settles.
   const micEngaged =
     !handsFree && (status === "recording" || status === "transcribing" || status === "opening");
   const showMic = !handsFree;
   const showHandsFree = !micEngaged;
 
   const label = handsFree || micEngaged ? T[LABEL_KEYS[visual]][lang] : T.statusIdle[lang];
-  const live = visual === "recording" ? Math.min(1, level * 1.6) : 0;
+  const live = visual === "recording" ? Math.min(1, level * 1.7) : 0;
+  const busy = visual === "recording" || visual === "listening" || visual === "transcribing";
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="flex h-32 items-center justify-center">
+    <div className="flex flex-col items-center gap-2.5 px-5 pb-5 pt-6">
+      <div className="flex items-center justify-center">
         <Collapsible visible={showHandsFree}>
-          <div className="relative flex items-center justify-center">
-            {handsFree && visual === "listening" && (
-              <>
-                <span aria-hidden className="animate-pulse-ring absolute inset-2 rounded-full bg-accent/25" />
-                <span
-                  aria-hidden
-                  className="animate-pulse-ring absolute inset-2 rounded-full bg-accent/20 [animation-delay:900ms]"
-                />
-              </>
-            )}
-            {handsFree && visual === "recording" && (
-              <span
-                aria-hidden
-                className="absolute h-24 w-24 rounded-full bg-danger/25 transition-transform duration-75 ease-out"
-                style={{ transform: `scale(${1 + live * 0.45})` }}
-              />
-            )}
-            <button
-              type="button"
-              onClick={onHandsFreeToggle}
-              disabled={!supported}
-              aria-pressed={handsFree}
-              aria-label={handsFree ? T.handsFreeStop[lang] : T.handsFree[lang]}
-              title={handsFree ? T.handsFreeStop[lang] : T.handsFreeHint[lang]}
-              className={`relative z-10 flex items-center justify-center rounded-full transition-all duration-300 ease-out active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
-                handsFree
-                  ? `h-24 w-24 shadow-[var(--shadow)] ${ORB_STYLES[visual]}`
-                  : "h-14 w-14 border border-line bg-surface text-text-muted hover:border-accent hover:text-text"
-              }`}
-            >
-              {handsFree ? <OrbFace visual={visual} live={live} /> : <InfinityIcon />}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onHandsFreeToggle}
+            disabled={!supported}
+            aria-pressed={handsFree}
+            aria-label={handsFree ? T.handsFreeStop[lang] : T.handsFree[lang]}
+            title={handsFree ? T.handsFreeStop[lang] : T.handsFreeHint[lang]}
+            className={`flex items-center justify-center rounded-full border transition-all duration-300 ease-out active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
+              handsFree
+                ? "h-14 w-14 border-pen bg-pen text-paper"
+                : "h-11 w-11 border-rule text-pencil hover:border-pen hover:text-pen"
+            }`}
+          >
+            {handsFree ? <Glyph visual={visual} /> : <InfinityIcon />}
+          </button>
         </Collapsible>
 
         <Collapsible visible={showMic}>
-          <div className="relative flex items-center justify-center">
-            {visual === "recording" && (
-              <span
-                aria-hidden
-                className="absolute h-24 w-24 rounded-full bg-danger/25 transition-transform duration-75 ease-out"
-                style={{ transform: `scale(${1 + live * 0.45})` }}
-              />
-            )}
-            <button
-              type="button"
-              onClick={onMicToggle}
-              disabled={!supported}
-              aria-pressed={visual === "recording"}
-              aria-label={label}
-              className={`relative z-10 flex h-24 w-24 items-center justify-center rounded-full shadow-[var(--shadow)] transition-all duration-300 ease-out active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${ORB_STYLES[micEngaged ? visual : "idle"]}`}
-            >
-              <OrbFace visual={micEngaged ? visual : "idle"} live={live} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onMicToggle}
+            disabled={!supported}
+            aria-pressed={visual === "recording"}
+            aria-label={label}
+            className={`flex h-14 w-14 items-center justify-center rounded-full border transition-all duration-300 ease-out active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
+              micEngaged
+                ? "border-pen bg-pen text-paper"
+                : "border-pen/60 text-pen hover:bg-pen-soft"
+            }`}
+          >
+            <Glyph visual={micEngaged ? visual : "idle"} />
+          </button>
         </Collapsible>
       </div>
 
-      <div className="flex flex-col items-center gap-1.5">
-        <p className="text-sm font-medium text-text" aria-live="polite">
-          {label}
-        </p>
-        {handsFree ? (
-          <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium">
-            {T.handsFree[lang]} · {T.poweredBy[lang]}
-          </span>
-        ) : (
-          showHandsFree && <span className="text-[11px] text-text-muted">{T.handsFreeIdleHint[lang]}</span>
+      {/* The pen stroke: a ruled line the ink travels along as you speak. */}
+      <div className="relative h-3 w-56" aria-hidden>
+        <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-rule" />
+        <span
+          className="absolute left-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-ink transition-[width] duration-75 ease-out"
+          style={{ width: `${busy ? Math.max(visual === "recording" ? 6 : 0, live * 100) : 0}%` }}
+        />
+        {busy && visual !== "recording" && (
+          <span className="animate-nib absolute left-0 top-1/2 h-[3px] w-[3px] -translate-y-1/2 rounded-full bg-pen" />
         )}
       </div>
 
-      <p className="min-h-6 max-w-md px-4 text-center text-sm text-text-muted" aria-live="polite">
-        {lastTranscript && <span className="italic">“{lastTranscript}”</span>}
+      <div className="flex flex-col items-center gap-1 text-center">
+        <p className="font-mono text-[11px] tracking-wide text-pencil" aria-live="polite">
+          {label}
+        </p>
+        {!handsFree && showHandsFree && (
+          <p className="font-mono text-[11px] text-pencil/70">{T.handsFreeIdleHint[lang]}</p>
+        )}
+        {handsFree && <p className="font-mono text-[11px] text-pencil/70">{T.poweredBy[lang]}</p>}
+      </div>
+
+      <p className="min-h-5 max-w-sm text-center text-[13px] text-ink/75" aria-live="polite">
+        {lastTranscript && <span>“{lastTranscript}”</span>}
       </p>
     </div>
   );
@@ -166,8 +140,8 @@ function Collapsible({ visible, children }: { visible: boolean; children: React.
   return (
     <div
       aria-hidden={!visible}
-      className={`overflow-visible transition-all duration-300 ease-out ${
-        visible ? "max-w-40 scale-100 opacity-100 mx-2" : "pointer-events-none max-w-0 scale-50 opacity-0 mx-0"
+      className={`transition-all duration-300 ease-out ${
+        visible ? "max-w-24 scale-100 opacity-100 mx-2" : "pointer-events-none max-w-0 scale-50 opacity-0 mx-0"
       }`}
     >
       {children}
@@ -175,20 +149,7 @@ function Collapsible({ visible, children }: { visible: boolean; children: React.
   );
 }
 
-function OrbFace({ visual, live }: { visual: Visual; live: number }) {
-  if (visual === "recording") {
-    return (
-      <span className="flex h-9 items-center gap-1" aria-hidden>
-        {BAR_WEIGHTS.map((weight, index) => (
-          <span
-            key={index}
-            className="block w-1.5 rounded-full bg-current transition-[height] duration-75 ease-out"
-            style={{ height: `${Math.max(6, live * weight * 36 + 6)}px` }}
-          />
-        ))}
-      </span>
-    );
-  }
+function Glyph({ visual }: { visual: Visual }) {
   if (visual === "transcribing" || visual === "opening") return <SpinnerIcon />;
   if (visual === "speaking") return <SpeakerIcon />;
   return <MicIcon />;
@@ -196,7 +157,7 @@ function OrbFace({ visual, live }: { visual: Visual; live: number }) {
 
 function InfinityIcon() {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
       <path d="M6.5 9a3 3 0 1 0 0 6c1.7 0 2.7-1.3 3.6-2.4l1.9-2.2C12.9 9.3 13.9 8 15.6 8a3 3 0 1 1 0 6c-1.7 0-2.7-1.3-3.6-2.4L10.1 9.4C9.2 8.3 8.2 7 6.5 7Z" />
     </svg>
   );
@@ -204,7 +165,7 @@ function InfinityIcon() {
 
 function MicIcon() {
   return (
-    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden>
       <rect x="9" y="2.5" width="6" height="11" rx="3" />
       <path d="M5.5 11a6.5 6.5 0 0 0 13 0" />
       <path d="M12 17.5V21" />
@@ -214,17 +175,17 @@ function MicIcon() {
 
 function SpeakerIcon() {
   return (
-    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M4 9.5v5h3.5l4.5 4v-13l-4.5 4H4Z" />
-      <path d="M16 9a4 4 0 0 1 0 6" className="animate-pulse" />
-      <path d="M18.5 6.5a7.5 7.5 0 0 1 0 11" className="animate-pulse [animation-delay:200ms]" />
+      <path d="M16 9a4 4 0 0 1 0 6" />
+      <path d="M18.5 6.5a7.5 7.5 0 0 1 0 11" />
     </svg>
   );
 }
 
 function SpinnerIcon() {
   return (
-    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" className="animate-spin" aria-hidden>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="animate-spin" aria-hidden>
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
       <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
     </svg>

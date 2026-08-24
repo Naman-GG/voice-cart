@@ -245,7 +245,7 @@ export default function Page() {
   );
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:py-10">
+    <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:py-12">
       <Header
         lang={state.lang}
         speakReplies={state.speakReplies}
@@ -253,63 +253,47 @@ export default function Page() {
         onSpeakChange={(value) => dispatch({ type: "set-speak", value })}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-        <div className="flex min-w-0 flex-col gap-5">
-          <section className="rounded-3xl border border-line bg-surface px-5 py-7 shadow-[var(--shadow)]">
-            <VoiceControls
-              status={capture.status}
-              speaking={speaking}
-              level={capture.level}
-              handsFree={handsFree}
-              supported={capture.supported}
-              lang={state.lang}
-              lastTranscript={state.log[0]?.transcript ?? null}
-              onMicToggle={() => {
-                markActivity();
-                capture.toggle();
-              }}
-              onHandsFreeToggle={() => toggleHandsFree(!handsFree)}
-            />
-            {!capture.supported && hydrated && (
-              <p className="mx-auto mt-4 max-w-sm text-center text-xs leading-relaxed text-text-muted">
-                {T.micUnsupported[state.lang]}
-              </p>
-            )}
-          </section>
-
-          {nudge && (
-            <IdleNudge
-              nudge={nudge}
-              lang={state.lang}
-              onAccept={() => acceptNudge(nudge)}
-              onDismiss={() => dismissNudge(nudge)}
-            />
-          )}
-
-          {state.helpOpen && (
-            <HelpPanel
-              lang={state.lang}
-              onRun={(command) => {
-                markActivity();
-                handleTranscript(command);
-              }}
-              onClose={() => dispatch({ type: "close-help" })}
-            />
-          )}
-
-          <FeedbackBanner
-            feedback={state.feedback}
+      <div className="mt-7 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.78fr)] lg:items-start lg:gap-10">
+        {/* The sheet: the mic that writes, and the list it writes on. */}
+        <div className="sheet sheet-margin min-w-0 rounded-[2px]">
+          <VoiceControls
+            status={capture.status}
+            speaking={speaking}
+            level={capture.level}
+            handsFree={handsFree}
+            supported={capture.supported}
             lang={state.lang}
-            onDismiss={() => dispatch({ type: "dismiss-feedback" })}
-          />
-
-          <CommandBar
-            lang={state.lang}
-            onSubmit={(text) => {
+            lastTranscript={state.log[0]?.transcript ?? null}
+            onMicToggle={() => {
               markActivity();
-              handleTranscript(text);
+              capture.toggle();
             }}
+            onHandsFreeToggle={() => toggleHandsFree(!handsFree)}
           />
+
+          {!capture.supported && hydrated && (
+            <p className="mx-auto max-w-sm px-5 pb-5 text-center text-[13px] leading-relaxed text-pencil">
+              {T.micUnsupported[state.lang]}
+            </p>
+          )}
+
+          {(state.feedback || nudge) && (
+            <div className="space-y-3 px-5 pb-5">
+              {nudge && (
+                <IdleNudge
+                  nudge={nudge}
+                  lang={state.lang}
+                  onAccept={() => acceptNudge(nudge)}
+                  onDismiss={() => dismissNudge(nudge)}
+                />
+              )}
+              <FeedbackBanner
+                feedback={state.feedback}
+                lang={state.lang}
+                onDismiss={() => dispatch({ type: "dismiss-feedback" })}
+              />
+            </div>
+          )}
 
           {hydrated ? (
             <ShoppingList
@@ -328,7 +312,27 @@ export default function Page() {
           )}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6">
+        {/* The desk beside the pad: everything the assistant offers. */}
+        <div className="flex min-w-0 flex-col gap-7">
+          <CommandBar
+            lang={state.lang}
+            onSubmit={(text) => {
+              markActivity();
+              handleTranscript(text);
+            }}
+          />
+
+          {state.helpOpen && (
+            <HelpPanel
+              lang={state.lang}
+              onRun={(command) => {
+                markActivity();
+                handleTranscript(command);
+              }}
+              onClose={() => dispatch({ type: "close-help" })}
+            />
+          )}
+
           {state.search &&
             (state.search.loading ? (
               <SearchSkeleton label={T.searchResults[state.lang]} />
@@ -345,19 +349,13 @@ export default function Page() {
           <SuggestionRail suggestions={suggestions} lang={state.lang} onAdd={addProduct} />
 
           {state.log.length > 0 && (
-            <section aria-label={T.history[state.lang]} className="min-w-0 space-y-2">
-              <h2 className="px-1 text-sm font-semibold">{T.history[state.lang]}</h2>
-              <ul className="scrollbar-thin max-h-56 space-y-1.5 overflow-y-auto rounded-2xl border border-line bg-surface p-3">
+            <section aria-label={T.history[state.lang]} className="min-w-0">
+              <h2 className="label border-b border-rule pb-2">{T.history[state.lang]}</h2>
+              <ul className="scrollbar-thin max-h-44 divide-y divide-[color:var(--rule)] overflow-y-auto">
                 {state.log.map((entry) => (
-                  <li key={entry.id} className="flex items-center gap-2 text-xs">
-                    <span
-                      aria-hidden
-                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                        entry.tone === "success" ? "bg-accent" : entry.tone === "warning" ? "bg-warning" : "bg-text-muted"
-                      }`}
-                    />
-                    <span className="truncate text-text-muted">“{entry.transcript}”</span>
-                    <span className="ml-auto shrink-0 rounded-full bg-surface-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-text-muted">
+                  <li key={entry.id} className="flex items-baseline gap-3 py-1.5">
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-pencil">{entry.transcript}</span>
+                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-pencil/70">
                       {entry.intent.replace("_", " ")}
                     </span>
                   </li>
@@ -368,9 +366,8 @@ export default function Page() {
         </div>
       </div>
 
-      <footer className="pb-2 pt-4 text-center text-[11px] text-text-muted">
-        Speech recognised by Whisper large-v3 on Groq. Press{" "}
-        <kbd className="rounded border border-line px-1">M</kbd> to toggle the mic.
+      <footer className="mt-10 border-t border-rule pt-4 text-center font-mono text-[10px] uppercase tracking-[0.14em] text-pencil/80">
+        Whisper large-v3 · press M for the mic
       </footer>
     </main>
   );
@@ -378,12 +375,11 @@ export default function Page() {
 
 function ListSkeleton() {
   return (
-    <div className="animate-pulse space-y-3 rounded-3xl border border-line bg-surface p-5" aria-hidden>
-      <div className="h-4 w-28 rounded bg-surface-muted" />
+    <div className="ruled" style={{ minHeight: "calc(var(--rule-step) * 8)" }} aria-hidden>
       {[0, 1, 2].map((index) => (
-        <div key={index} className="flex items-center gap-3">
-          <div className="h-6 w-6 rounded-full bg-surface-muted" />
-          <div className="h-4 flex-1 rounded bg-surface-muted" />
+        <div key={index} className="rule-row gap-3 pr-4">
+          <span className="w-[var(--margin-x)] shrink-0" />
+          <span className="h-3 w-40 animate-pulse rounded-full bg-rule" />
         </div>
       ))}
     </div>
@@ -392,13 +388,15 @@ function ListSkeleton() {
 
 function SearchSkeleton({ label }: { label: string }) {
   return (
-    <section className="space-y-3 rounded-3xl border border-line bg-surface p-4" aria-label={label} aria-busy>
-      <div className="h-4 w-24 animate-pulse rounded bg-surface-muted" />
-      <div className="grid gap-2 sm:grid-cols-2">
-        {[0, 1, 2, 3].map((index) => (
-          <div key={index} className="h-14 animate-pulse rounded-2xl bg-surface-muted" />
+    <section aria-label={label} aria-busy>
+      <div className="label border-b border-rule pb-2">{label}</div>
+      <ul className="divide-y divide-[color:var(--rule)]">
+        {[0, 1, 2].map((index) => (
+          <li key={index} className="py-3">
+            <span className="block h-3 w-2/3 animate-pulse rounded-full bg-rule" />
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }

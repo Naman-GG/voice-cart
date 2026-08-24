@@ -9,45 +9,36 @@ interface Props {
   onClose: () => void;
 }
 
-/**
- * The command reference opened by "help". A spoken one-liner is easy to miss,
- * so the reference is shown on screen too, with every example runnable.
- */
+/** The command reference. A spoken one-liner is too easy to miss. */
 export function HelpPanel({ lang, onRun, onClose }: Props) {
   return (
-    <section
-      aria-label={T.helpTitle[lang]}
-      className="animate-rise rounded-3xl border border-line bg-surface p-5 shadow-[var(--shadow)]"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold">{T.helpTitle[lang]}</h2>
-          <p className="mt-0.5 text-xs text-text-muted">{T.helpHint[lang]}</p>
-        </div>
+    <section aria-label={T.helpTitle[lang]} className="animate-write">
+      <div className="flex items-baseline justify-between gap-3 border-b border-rule pb-2">
+        <h2 className="label">{T.helpTitle[lang]}</h2>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full border border-line px-3 py-1 text-xs text-text-muted transition hover:text-text"
+          className="font-mono text-[11px] text-pencil underline-offset-4 transition hover:text-pen hover:underline"
         >
           {T.close[lang]}
         </button>
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <p className="pt-2 font-mono text-[11px] text-pencil">{T.helpHint[lang]}</p>
+
+      <div className="mt-2 grid gap-x-8 gap-y-4 sm:grid-cols-2">
         {COMMAND_REFERENCE[lang].map((section) => (
           <div key={section.group}>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-              {section.group}
-            </p>
-            <ul className="space-y-1">
+            <p className="label mb-1">{section.group}</p>
+            <ul className="space-y-0.5">
               {section.examples.map((example) => (
                 <li key={example}>
                   <button
                     type="button"
                     onClick={() => onRun(example)}
-                    className="w-full rounded-lg px-2 py-1 text-left text-sm text-text transition hover:bg-surface-muted"
+                    className="text-left text-[14px] text-ink underline-offset-4 transition hover:text-pen hover:underline"
                   >
-                    “{example}”
+                    {example}
                   </button>
                 </li>
               ))}

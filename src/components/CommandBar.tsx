@@ -10,7 +10,7 @@ interface Props {
   onSubmit: (text: string) => void;
 }
 
-/** Typed fallback for unsupported browsers, plus tappable example commands. */
+/** Typing goes on the next blank rule: an underline, not a box. */
 export function CommandBar({ lang, disabled, onSubmit }: Props) {
   const [value, setValue] = useState("");
 
@@ -22,14 +22,17 @@ export function CommandBar({ lang, disabled, onSubmit }: Props) {
   };
 
   return (
-    <div className="min-w-0 space-y-3">
+    <div className="min-w-0 space-y-2.5">
       <form
         onSubmit={(event) => {
           event.preventDefault();
           submit(value);
         }}
-        className="flex items-center gap-2"
+        className="flex items-center gap-3 border-b border-rule pb-1.5 focus-within:border-pen"
       >
+        <span aria-hidden className="font-mono text-sm text-pencil">
+          ›
+        </span>
         <input
           value={value}
           onChange={(event) => setValue(event.target.value)}
@@ -37,33 +40,30 @@ export function CommandBar({ lang, disabled, onSubmit }: Props) {
           placeholder={T.typeInstead[lang]}
           aria-label={T.typeInstead[lang]}
           enterKeyHint="send"
-          className="min-w-0 flex-1 rounded-full border border-line bg-surface px-4 py-2.5 text-sm outline-none transition placeholder:text-text-muted focus:border-accent"
+          className="min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-pencil/70"
         />
         <button
           type="submit"
           disabled={disabled || !value.trim()}
-          className="rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-[color:var(--accent-contrast)] transition hover:brightness-105 disabled:opacity-40"
+          className="font-mono text-[11px] uppercase tracking-[0.12em] text-pen transition disabled:opacity-30"
         >
           {T.send[lang]}
         </button>
       </form>
 
-      <div>
-        <p className="mb-2 px-1 text-xs font-medium text-text-muted">{T.tryTheseCommands[lang]}</p>
-        <ul className="scrollbar-thin -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          {EXAMPLE_COMMANDS[lang].map((example) => (
-            <li key={example}>
-              <button
-                type="button"
-                onClick={() => submit(example)}
-                className="whitespace-nowrap rounded-full border border-line bg-surface px-3 py-1.5 text-xs text-text-muted transition hover:border-accent hover:text-text"
-              >
-                “{example}”
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <ul className="scrollbar-thin flex gap-x-4 gap-y-1 overflow-x-auto pb-1">
+        {EXAMPLE_COMMANDS[lang].slice(0, 4).map((example) => (
+          <li key={example}>
+            <button
+              type="button"
+              onClick={() => submit(example)}
+              className="whitespace-nowrap font-mono text-[11px] text-pencil underline-offset-4 transition hover:text-pen hover:underline"
+            >
+              {example}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -109,6 +109,15 @@ Cadence is *learned*: if you actually buy rice every 4 days, that beats the cata
   if the request fails, so search still works offline.
 
 ### 5. UI/UX
+The interface is a **sheet of ruled paper on a desk**. Items sit *on* the printed
+rules, quantities are written in the margin past the red margin line, and the
+signature gesture is a pen stroke: the live microphone level draws as an ink line
+travelling along a rule, and checking an item off strikes it through with the same
+stroke. Two typefaces only — Instrument Sans for item names, Spline Sans Mono for
+quantities, prices and labels, because a tally really is monospace — with Noto Sans
+Devanagari so Hindi sets properly. Everything the assistant offers stays off the
+paper, quiet, on the desk beside it.
+
 - Minimalist, mobile-first, single-column on phones and two-column on desktop.
 - **Real-time visual feedback** for every recognised command, colour-coded by outcome.
 - Loading skeletons while the saved list hydrates and while a search is in flight.

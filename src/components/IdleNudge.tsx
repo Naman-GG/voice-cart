@@ -12,48 +12,34 @@ interface Props {
   onDismiss: () => void;
 }
 
-/**
- * The proactive card shown when the assistant offers something out loud
- * after a stretch of silence. Answerable by voice ("yes"/"no") or by tap.
- */
+/** The assistant's own pencilled question, answerable by voice or by tap. */
 export function IdleNudge({ nudge, lang, onAccept, onDismiss }: Props) {
   const product = getProduct(nudge.productId);
   if (!product) return null;
 
   return (
-    <section
-      aria-live="polite"
-      className="animate-rise rounded-3xl border border-accent/50 bg-accent-soft px-5 py-4 shadow-[var(--shadow)]"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-            <span className="relative flex h-2 w-2" aria-hidden>
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
-            </span>
-            {T.suggestions[lang]}
-          </p>
-          <p className="mt-1 text-sm font-medium text-text">{nudge.reason[lang]}</p>
-          <p className="mt-0.5 text-xs text-text-muted">{formatPrice(salePrice(product))}</p>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="rounded-full border border-line bg-surface px-3 py-2 text-xs font-medium text-text-muted transition hover:text-text"
-          >
-            {T.notNow[lang]}
-          </button>
-          <button
-            type="button"
-            onClick={onAccept}
-            className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-[color:var(--accent-contrast)] transition hover:brightness-105 active:scale-95"
-          >
-            + {T.addIt[lang]}
-          </button>
-        </div>
+    <section aria-live="polite" className="animate-write border-l-2 border-pen pl-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="text-sm text-ink">{nudge.reason[lang]}</p>
+        <span className="font-mono text-[11px] tabular-nums text-pencil">
+          {formatPrice(salePrice(product))}
+        </span>
+      </div>
+      <div className="mt-1 flex items-center gap-4">
+        <button
+          type="button"
+          onClick={onAccept}
+          className="font-mono text-[11px] uppercase tracking-[0.12em] text-pen underline-offset-4 hover:underline"
+        >
+          {T.addIt[lang]}
+        </button>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="font-mono text-[11px] uppercase tracking-[0.12em] text-pencil underline-offset-4 hover:underline"
+        >
+          {T.notNow[lang]}
+        </button>
       </div>
     </section>
   );

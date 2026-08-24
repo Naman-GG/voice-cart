@@ -20,6 +20,9 @@ interface Props {
   onUndo: () => void;
 }
 
+/** Enough blank rules below the last item that the sheet still reads as paper. */
+const MIN_RULES = 8;
+
 export function ShoppingList({
   items,
   lang,
@@ -34,34 +37,33 @@ export function ShoppingList({
   const [openSwap, setOpenSwap] = useState<string | null>(null);
   const pending = items.filter((item) => !item.checked);
   const groups = groupByCategory(items);
-  const total = estimatedTotal(items.filter((item) => !item.checked));
+  const total = estimatedTotal(pending);
+  const rowCount = groups.reduce((sum, group) => sum + group.items.length + 1, 0);
 
   return (
-    <section className="rounded-3xl border border-line bg-surface shadow-[var(--shadow)]" aria-label={T.yourList[lang]}>
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
-        <div>
-          <h2 className="text-base font-semibold">{T.yourList[lang]}</h2>
-          <p className="text-xs text-text-muted">
+    <section aria-label={T.yourList[lang]}>
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-rule px-5 pb-2 pt-5">
+        <h2 className="label text-ink">{T.yourList[lang]}</h2>
+        <div className="flex items-center gap-3">
+          <p className="font-mono text-[11px] text-pencil">
             {pending.length} {T.items[lang]}
             {items.length > pending.length && ` · ${items.length - pending.length} ${T.bought[lang]}`}
-            {total > 0 && ` · ${T.estimatedTotal[lang]} ${formatPrice(total)}`}
+            {total > 0 && ` · ${formatPrice(total)}`}
           </p>
-        </div>
-        <div className="flex items-center gap-2">
           {canUndo && (
             <button
               type="button"
               onClick={onUndo}
-              className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-text-muted transition hover:text-text"
+              className="font-mono text-[11px] text-pencil underline-offset-4 transition hover:text-pen hover:underline"
             >
-              ↺ {T.undo[lang]}
+              {T.undo[lang]}
             </button>
           )}
           {items.length > 0 && (
             <button
               type="button"
               onClick={onClear}
-              className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-danger transition hover:bg-danger/10"
+              className="font-mono text-[11px] text-pencil underline-offset-4 transition hover:text-erase hover:underline"
             >
               {T.clearAll[lang]}
             </button>
@@ -69,115 +71,144 @@ export function ShoppingList({
         </div>
       </header>
 
-      {items.length === 0 ? (
-        <div className="px-5 py-12 text-center">
-          <p className="text-sm font-medium text-text-muted">{T.emptyList[lang]}</p>
-          <p className="mt-1 text-xs text-text-muted">{T.emptyHint[lang]}</p>
-        </div>
-      ) : (
-        <ul className="divide-y divide-[color:var(--border)]">
-          {groups.map((group) => (
-            <li key={group.category}>
-              <p className="flex items-center gap-2 bg-surface-muted px-5 py-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
-                <span aria-hidden>{CATEGORIES[group.category].emoji}</span>
-                {CATEGORIES[group.category].label[lang]}
-              </p>
-              <ul>
-                {group.items.map((item) => {
-                  const product = getProduct(item.productId);
-                  const quantity = quantityLabel(item, lang);
-                  const swaps = item.productId ? substitutesFor(item.productId) : [];
-                  const isOpen = openSwap === item.id;
-                  return (
-                    <li key={item.id} className="animate-rise px-5 py-3">
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          role="checkbox"
-                          aria-checked={item.checked}
-                          onClick={() => onToggle(item.id)}
-                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition ${
-                            item.checked ? "border-accent bg-accent text-[color:var(--accent-contrast)]" : "border-line"
-                          }`}
-                        >
-                          {item.checked && <span className="text-xs">✓</span>}
-                        </button>
+      <div
+        className="ruled relative"
+        style={{ minHeight: `calc(var(--rule-step) * ${Math.max(MIN_RULES, rowCount + 2)})` }}
+      >
+        {items.length === 0 ? (
+          <p className="rule-row pl-[calc(var(--margin-x)+1rem)] pr-5 text-sm text-pencil">
+            {T.emptyHint[lang]}
+          </p>
+        ) : (
+          <ul>
+            {groups.map((group) => (
+              <li key={group.category}>
+                <p className="rule-row label pl-[calc(var(--margin-x)+1rem)] pr-5">
+                  {CATEGORIES[group.category].label[lang]}
+                </p>
+                <ul>
+                  {group.items.map((item) => {
+                    const product = getProduct(item.productId);
+                    const name = product ? product.name[lang] : item.name;
+                    const meta = [quantityLabel(item, lang), item.brand, item.notes].filter(Boolean).join(" · ");
+                    const swaps = item.productId ? substitutesFor(item.productId) : [];
+                    const isOpen = openSwap === item.id;
 
-                        <div className="min-w-0 flex-1">
-                          <p className={`truncate text-sm font-medium ${item.checked ? "text-text-muted line-through" : ""}`}>
-                            {product ? product.name[lang] : item.name}
-                          </p>
-                          <p className="truncate text-xs text-text-muted">
-                            {[quantity, item.brand, item.notes].filter(Boolean).join(" · ")}
-                            {product && ` · ${formatPrice(salePrice(product))}`}
-                          </p>
-                        </div>
+                    return (
+                      <li key={item.id} className="animate-write">
+                        <div className="rule-row group gap-3 pr-4">
+                          {/* Quantity, written in the margin like a real list. */}
+                          <span
+                            className={`w-[var(--margin-x)] shrink-0 pr-3 text-right font-mono text-sm tabular-nums ${
+                              item.checked ? "text-pencil" : "text-ink"
+                            }`}
+                          >
+                            {Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2)}
+                          </span>
 
-                        <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            aria-label="Decrease quantity"
-                            onClick={() => onQuantity(item.id, -1)}
-                            className="h-7 w-7 rounded-full border border-line text-sm leading-none text-text-muted transition hover:text-text"
+                            role="checkbox"
+                            aria-checked={item.checked}
+                            onClick={() => onToggle(item.id)}
+                            className="flex min-w-0 flex-1 items-baseline gap-2 pl-1 text-left"
                           >
-                            −
-                          </button>
-                          <span className="w-6 text-center text-sm tabular-nums">{item.quantity}</span>
-                          <button
-                            type="button"
-                            aria-label="Increase quantity"
-                            onClick={() => onQuantity(item.id, 1)}
-                            className="h-7 w-7 rounded-full border border-line text-sm leading-none text-text-muted transition hover:text-text"
-                          >
-                            +
-                          </button>
-                          {swaps.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setOpenSwap(isOpen ? null : item.id)}
-                              aria-expanded={isOpen}
-                              className="ml-1 rounded-full border border-line px-2 py-1 text-[11px] text-text-muted transition hover:text-text"
+                            <span
+                              className={`truncate text-[15px] ${
+                                item.checked ? "struck" : "text-ink decoration-pencil/50 underline-offset-4 group-hover:underline"
+                              }`}
                             >
-                              ⇄ {T.swap[lang]}
-                            </button>
+                              {name}
+                            </span>
+                            {meta && <span className="truncate font-mono text-[11px] text-pencil">{meta}</span>}
+                          </button>
+
+                          {product && (
+                            <span className="shrink-0 font-mono text-[11px] tabular-nums text-pencil">
+                              {formatPrice(salePrice(product))}
+                            </span>
                           )}
-                          <button
-                            type="button"
-                            aria-label={`Remove ${item.name}`}
-                            onClick={() => onRemove(item.id)}
-                            className="h-7 w-7 rounded-full text-text-muted transition hover:bg-danger/10 hover:text-danger"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
 
-                      {isOpen && swaps.length > 0 && (
-                        <div className="animate-rise mt-2 flex flex-wrap gap-2 pl-9">
-                          {swaps.map((swap) => (
-                            <button
-                              key={swap.id}
-                              type="button"
-                              onClick={() => {
-                                onAddProduct(swap.id);
-                                onRemove(item.id);
-                                setOpenSwap(null);
-                              }}
-                              className="rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-text transition hover:brightness-95"
-                            >
-                              {swap.name[lang]} · {formatPrice(salePrice(swap))}
-                            </button>
-                          ))}
+                          <span className="flex shrink-0 items-center opacity-70 transition group-hover:opacity-100">
+                            <IconButton label="Decrease quantity" onClick={() => onQuantity(item.id, -1)}>
+                              −
+                            </IconButton>
+                            <IconButton label="Increase quantity" onClick={() => onQuantity(item.id, 1)}>
+                              +
+                            </IconButton>
+                            {swaps.length > 0 && (
+                              <IconButton
+                                label={`${T.swap[lang]} ${name}`}
+                                expanded={isOpen}
+                                onClick={() => setOpenSwap(isOpen ? null : item.id)}
+                                className="hidden sm:block"
+                              >
+                                ⇄
+                              </IconButton>
+                            )}
+                            <IconButton label={`Remove ${name}`} danger onClick={() => onRemove(item.id)}>
+                              ×
+                            </IconButton>
+                          </span>
                         </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      )}
+
+                        {isOpen && swaps.length > 0 && (
+                          <div className="animate-write flex flex-wrap gap-x-4 gap-y-1 pb-2 pl-[calc(var(--margin-x)+1rem)] pr-5">
+                            {swaps.map((swap) => (
+                              <button
+                                key={swap.id}
+                                type="button"
+                                onClick={() => {
+                                  onAddProduct(swap.id);
+                                  onRemove(item.id);
+                                  setOpenSwap(null);
+                                }}
+                                className="font-mono text-[11px] text-pen underline-offset-4 hover:underline"
+                              >
+                                {swap.name[lang]} {formatPrice(salePrice(swap))}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
+  );
+}
+
+function IconButton({
+  label,
+  onClick,
+  children,
+  danger,
+  expanded,
+  className = "",
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  danger?: boolean;
+  expanded?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-expanded={expanded}
+      onClick={onClick}
+      className={`h-7 w-7 rounded-full font-mono text-sm leading-none text-pencil transition hover:bg-pen-soft ${
+        danger ? "hover:text-erase" : "hover:text-pen"
+      } ${className}`}
+    >
+      {children}
+    </button>
   );
 }

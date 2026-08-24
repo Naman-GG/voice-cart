@@ -1,9 +1,27 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Instrument_Sans, Noto_Sans_Devanagari, Spline_Sans_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+/** Item names: clear and legible, never a script face. */
+const instrument = Instrument_Sans({
+  variable: "--font-instrument",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
+/** Quantities, prices and labels — a tally is monospace, like a docket. */
+const splineMono = Spline_Sans_Mono({
+  variable: "--font-spline-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+});
+
+/** So Hindi sets properly rather than falling back to a system default. */
+const devanagari = Noto_Sans_Devanagari({
+  variable: "--font-devanagari",
+  subsets: ["devanagari"],
+  weight: ["400", "500", "600"],
+});
 
 export const metadata: Metadata = {
   title: "Voice Cart — Voice Command Shopping Assistant",
@@ -23,15 +41,17 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6f7f9" },
-    { media: "(prefers-color-scheme: dark)", color: "#0c0f13" },
+    { media: "(prefers-color-scheme: light)", color: "#e9e7e1" },
+    { media: "(prefers-color-scheme: dark)", color: "#131519" },
   ],
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
+      <body
+        className={`${instrument.variable} ${splineMono.variable} ${devanagari.variable} font-sans antialiased`}
+      >
         {children}
       </body>
     </html>

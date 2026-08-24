@@ -10,79 +10,64 @@ interface Props {
   onSpeakChange: (value: boolean) => void;
 }
 
+/** The printed header of the pad: a stamped title and a hairline. */
 export function Header({ lang, speakReplies, onLangChange, onSpeakChange }: Props) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3">
+    <header className="flex items-baseline justify-between gap-4">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">
-          <span aria-hidden className="mr-1.5">🛒</span>
-          {T.appName[lang]}
-        </h1>
-        <p className="text-xs text-text-muted">{T.tagline[lang]}</p>
+        <h1 className="font-mono text-[13px] uppercase tracking-[0.22em] text-ink">{T.appName[lang]}</h1>
+        <p className="mt-0.5 text-[13px] text-pencil">{T.tagline[lang]}</p>
       </div>
 
-      <div className="flex items-center gap-2">
-        <div
-          role="radiogroup"
-          aria-label={T.language[lang]}
-          className="flex rounded-full border border-line bg-surface p-0.5"
-        >
-          {LANGUAGES.map((option) => (
-            <button
-              key={option.code}
-              type="button"
-              role="radio"
-              aria-checked={lang === option.code}
-              onClick={() => onLangChange(option.code)}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                lang === option.code
-                  ? "bg-accent text-[color:var(--accent-contrast)]"
-                  : "text-text-muted hover:text-text"
-              }`}
-            >
-              {option.nativeLabel}
-            </button>
+      <div className="flex items-center gap-4">
+        <div role="radiogroup" aria-label={T.language[lang]} className="flex items-baseline gap-2">
+          {LANGUAGES.map((option, index) => (
+            <span key={option.code} className="flex items-baseline gap-2">
+              {index > 0 && <span aria-hidden className="font-mono text-[11px] text-rule">/</span>}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={lang === option.code}
+                onClick={() => onLangChange(option.code)}
+                className={`font-mono text-[11px] uppercase tracking-[0.12em] underline-offset-4 transition ${
+                  lang === option.code ? "text-ink underline" : "text-pencil hover:text-pen"
+                }`}
+              >
+                {option.nativeLabel}
+              </button>
+            </span>
           ))}
         </div>
 
-        <Toggle
-          active={speakReplies}
+        <button
+          type="button"
           onClick={() => onSpeakChange(!speakReplies)}
-          label={T.voiceReplies[lang]}
+          aria-pressed={speakReplies}
+          aria-label={T.voiceReplies[lang]}
           title={T.voiceReplies[lang]}
+          className={`transition ${speakReplies ? "text-pen" : "text-pencil hover:text-ink"}`}
         >
-          {speakReplies ? "🔊" : "🔇"}
-        </Toggle>
+          {speakReplies ? <SpeakerOnIcon /> : <SpeakerOffIcon />}
+        </button>
       </div>
     </header>
   );
 }
 
-function Toggle({
-  active,
-  onClick,
-  label,
-  title,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  title: string;
-  children: React.ReactNode;
-}) {
+function SpeakerOnIcon() {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      aria-label={label}
-      title={title}
-      className={`h-9 w-9 rounded-full border text-sm transition ${
-        active ? "border-accent bg-accent-soft text-text" : "border-line bg-surface text-text-muted hover:text-text"
-      }`}
-    >
-      {children}
-    </button>
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 9.5v5h3.5l4.5 4v-13l-4.5 4H4Z" />
+      <path d="M16 9.5a3.5 3.5 0 0 1 0 5" />
+    </svg>
+  );
+}
+
+function SpeakerOffIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 9.5v5h3.5l4.5 4v-13l-4.5 4H4Z" />
+      <path d="m16 10 4 4M20 10l-4 4" />
+    </svg>
   );
 }

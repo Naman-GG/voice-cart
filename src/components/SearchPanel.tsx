@@ -1,6 +1,5 @@
 "use client";
 
-import { CATEGORIES } from "@/lib/catalog";
 import { T, formatPrice } from "@/lib/i18n";
 import { isOnSale } from "@/lib/search";
 import type { Lang, SearchFilters, SearchResult } from "@/lib/types";
@@ -21,70 +20,49 @@ function describeFilters(filters: SearchFilters, lang: Lang): string {
   if (filters.minPrice !== undefined && filters.maxPrice !== undefined) {
     parts.push(`${formatPrice(filters.minPrice)}–${formatPrice(filters.maxPrice)}`);
   } else if (filters.maxPrice !== undefined) {
-    parts.push(`< ${formatPrice(filters.maxPrice)}`);
+    parts.push(`under ${formatPrice(filters.maxPrice)}`);
   } else if (filters.minPrice !== undefined) {
-    parts.push(`> ${formatPrice(filters.minPrice)}`);
+    parts.push(`over ${formatPrice(filters.minPrice)}`);
   }
   return parts.filter(Boolean).join(" · ");
 }
 
-/** Voice-activated search results with the active filters made visible. */
 export function SearchPanel({ filters, results, lang, onAdd, onClose }: Props) {
   return (
-    <section
-      aria-label={T.searchResults[lang]}
-      className="animate-rise space-y-3 rounded-3xl border border-line bg-surface p-4 shadow-[var(--shadow)]"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold">{T.searchResults[lang]}</h2>
-          <p className="mt-0.5 text-xs text-text-muted">{describeFilters(filters, lang)}</p>
-        </div>
+    <section aria-label={T.searchResults[lang]} className="animate-write">
+      <div className="flex items-baseline justify-between gap-3 border-b border-rule pb-2">
+        <h2 className="label">{T.searchResults[lang]}</h2>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full border border-line px-3 py-1 text-xs text-text-muted transition hover:text-text"
+          className="font-mono text-[11px] text-pencil underline-offset-4 transition hover:text-pen hover:underline"
         >
           {T.clearSearch[lang]}
         </button>
       </div>
+      <p className="pt-2 font-mono text-[11px] text-pencil">{describeFilters(filters, lang)}</p>
 
       {results.length === 0 ? (
-        <p className="py-6 text-center text-sm text-text-muted">{T.noResults[lang]}</p>
+        <p className="py-4 text-sm text-pencil">{T.noResults[lang]}</p>
       ) : (
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="mt-1 divide-y divide-[color:var(--rule)]">
           {results.map(({ product, price, matchedBrand }) => (
-            <li
-              key={product.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface-muted px-3 py-2.5"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  <span aria-hidden className="mr-1">{CATEGORIES[product.category].emoji}</span>
-                  {product.name[lang]}
-                </p>
-                <p className="truncate text-xs text-text-muted">
-                  {[
-                    matchedBrand,
-                    product.sizes[Math.min(1, product.sizes.length - 1)],
-                    product.organic ? T.organic[lang] : null,
-                    isOnSale(product) ? T.onSale[lang] : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <span className="text-sm font-semibold tabular-nums">{formatPrice(price)}</span>
-                <button
-                  type="button"
-                  onClick={() => onAdd(product.id)}
-                  aria-label={`${T.add[lang]} ${product.name[lang]}`}
-                  className="h-7 w-7 rounded-full bg-accent text-sm font-bold text-[color:var(--accent-contrast)] transition hover:brightness-105 active:scale-95"
-                >
-                  +
-                </button>
-              </div>
+            <li key={product.id} className="flex items-baseline gap-3 py-2">
+              <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{product.name[lang]}</span>
+              <span className="hidden shrink-0 truncate font-mono text-[10px] uppercase tracking-[0.1em] text-pencil sm:block">
+                {[matchedBrand, product.organic ? T.organic[lang] : null, isOnSale(product) ? T.onSale[lang] : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+              <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink">{formatPrice(price)}</span>
+              <button
+                type="button"
+                onClick={() => onAdd(product.id)}
+                aria-label={`${T.add[lang]} ${product.name[lang]}`}
+                className="h-7 w-7 shrink-0 rounded-full font-mono text-base leading-none text-pencil transition hover:bg-pen-soft hover:text-pen"
+              >
+                +
+              </button>
             </li>
           ))}
         </ul>
