@@ -32,7 +32,7 @@ Two deliberately different halves:
   sharpen recall further.
 - **Understanding is local and deterministic.** Once there is a transcript, intent
   parsing is a **rule-based NLP pipeline** written from scratch — no LLM in the loop.
-  That keeps interpretation free, instant, and covered by **106 unit tests**.
+  That keeps interpretation free, instant, and covered by **115 unit tests**.
 
 ---
 
@@ -95,6 +95,9 @@ Cadence is *learned*: if you actually buy rice every 4 days, that beats the cata
   `दो लीटर दूध`. Only a unit you actually say is kept; everything else counts in pieces,
   so `add toothpaste` reads as one toothpaste rather than "1 g toothpaste". Repeat
   additions merge (`2 bottles` + `3 bottles` = `5 bottles`).
+- **Compound instructions** — `remove paneer and add tofu` is two commands in one
+  breath, applied in order with a single reply and a single undo. Word order is
+  respected: English breaks before each verb, Hindi after it (`पनीर हटाओ और टोफू जोड़ो`).
 - **Multi-item utterances** — `add bread and butter and 6 eggs` adds three items, and
   several products named inside one clause are split apart too, so
   `1 kg apples and 1 kg bananas along with 1 kg coriander` yields all three with their
@@ -156,7 +159,7 @@ npm run dev          # http://localhost:3000
 ```
 
 ```bash
-npm test             # 106 unit tests (Vitest)
+npm test             # 115 unit tests (Vitest)
 npm run typecheck    # tsc --noEmit
 npm run lint         # eslint
 npm run build        # production build

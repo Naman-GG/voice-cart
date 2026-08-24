@@ -332,3 +332,76 @@ export function matchConfirmation(transcript: string): "yes" | "no" | null {
   if (AFFIRMATIVE.some((pattern) => pattern.test(text))) return "yes";
   return null;
 }
+
+
+/**
+ * Intents that can begin a new clause. A verb from one of these mid-sentence
+ * means the speaker has moved on to a second instruction.
+ */
+const CLAUSE_INTENTS = new Set<Intent>(["add", "remove", "check", "update_quantity", "search", "clear"]);
+
+/** Command verbs in the utterance, in order, with the span each one covers. */
+function findClauseStarts(text: string): { index: number; end: number; intent: Intent }[] {
+  const marks: { index: number; end: number; intent: Intent }[] = [];
+
+  for (const { intent, patterns } of INTENT_PATTERNS) {
+    if (!CLAUSE_INTENTS.has(intent)) continue;
+    for (const pattern of patterns) {
+      const scanner = new RegExp(pattern.source, "g");
+      let match: RegExpExecArray | null;
+      while ((match = scanner.exec(text)) !== null) {
+        marks.push({ index: match.index, end: match.index + match[0].length, intent });
+        if (match.index === scanner.lastIndex) scanner.lastIndex += 1;
+      }
+    }
+  }
+
+  marks.sort((a, b) => a.index - b.index);
+
+  // Several patterns often match the same verb ("i need" and "need"); keep one.
+  const deduped: { index: number; end: number; intent: Intent }[] = [];
+  for (const mark of marks) {
+    const previous = deduped[deduped.length - 1];
+    if (previous && mark.index - previous.index < 4) continue;
+    deduped.push(mark);
+  }
+  return deduped;
+}
+
+/**
+ * Parses an utterance that may carry more than one instruction, such as
+ * "remove paneer and add tofu". Splitting only happens when two *different*
+ * command verbs appear: repeated verbs of the same kind ("add milk and add
+ * bread") are already handled as one multi-item command.
+ */
+export function parseUtterance(transcript: string, defaultLang: Lang = "en"): ParsedCommand[] {
+  const single = () => [parseCommand(transcript, defaultLang)];
+  const text = normalize(transcript);
+  if (!text) return single();
+
+  const marks = findClauseStarts(text);
+  if (marks.length < 2) return single();
+  if (new Set(marks.map((mark) => mark.intent)).size < 2) return single();
+
+  /*
+   * Where a clause ends depends on word order. English puts the verb first
+   * ("remove paneer | add tofu"), so the break goes before each later verb.
+   * Hindi puts it last ("पनीर हटाओ | और टोफू जोड़ो"), so the break goes after
+   * it — splitting before the verb would leave the next clause's object
+   * stranded in the previous one.
+   */
+  const verbFinal = hasDevanagari(text);
+  const bounds = verbFinal
+    ? [0, ...marks.slice(0, -1).map((mark) => mark.end), text.length]
+    : [0, ...marks.slice(1).map((mark) => mark.index), text.length];
+  const commands: ParsedCommand[] = [];
+  for (let i = 0; i < bounds.length - 1; i += 1) {
+    const clause = text.slice(bounds[i], bounds[i + 1]).trim();
+    if (!clause) continue;
+    const parsed = parseCommand(clause, defaultLang);
+    // Drop fragments that carried a verb but no item.
+    if (parsed.intent === "unknown" && !parsed.items.length) continue;
+    commands.push(parsed);
+  }
+  return commands.length ? commands : single();
+}

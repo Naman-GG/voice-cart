@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCommand } from "@/lib/nlp/parser";
+import { parseCommand, parseUtterance } from "@/lib/nlp/parser";
 import {
   estimatedTotal,
   groupByCategory,
@@ -148,5 +148,43 @@ describe("estimated total", () => {
     const custom = run(initialState, "add zzyzx widgets");
     expect(custom.items[0].productId).toBeNull();
     expect(estimatedTotal(custom.items)).toBe(0);
+  });
+});
+
+describe("compound utterances", () => {
+  const runAll = (state: AppState, utterance: string) =>
+    reducer(state, {
+      type: "commands",
+      commands: parseUtterance(utterance, state.lang),
+      transcript: utterance,
+      at: AT,
+    });
+
+  it("removes one item and adds another in a single turn", () => {
+    let state = runAll(initialState, "add paneer");
+    state = runAll(state, "remove paneer and add tofu");
+    expect(state.items.map((item) => item.productId)).toEqual(["tofu"]);
+    expect(state.feedback?.message.en).toMatch(/removed/i);
+    expect(state.feedback?.message.en).toMatch(/added/i);
+  });
+
+  it("undoes the whole turn, not just the last half", () => {
+    let state = runAll(initialState, "add paneer");
+    state = runAll(state, "remove paneer and add tofu");
+    state = reducer(state, { type: "undo" });
+    expect(state.items.map((item) => item.productId)).toEqual(["paneer"]);
+  });
+
+  it("reports the worst outcome when one half fails", () => {
+    const state = runAll(initialState, "remove milk and add bread");
+    // Milk was never on the list, so the turn is a warning overall.
+    expect(state.feedback?.tone).toBe("warning");
+    expect(state.items.map((item) => item.productId)).toEqual(["bread"]);
+  });
+
+  it("logs the whole utterance with both intents", () => {
+    const state = runAll(initialState, "remove milk and add bread");
+    expect(state.log[0].transcript).toBe("remove milk and add bread");
+    expect(state.log[0].intent).toBe("remove + add");
   });
 });

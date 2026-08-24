@@ -13,7 +13,7 @@ import { SuggestionRail } from "@/components/SuggestionRail";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { useVoiceCapture, type CaptureErrorCode } from "@/hooks/useVoiceCapture";
 import { LANGUAGES, T } from "@/lib/i18n";
-import { matchConfirmation, parseCommand } from "@/lib/nlp/parser";
+import { matchConfirmation, parseUtterance } from "@/lib/nlp/parser";
 import { searchCatalog } from "@/lib/search";
 import { searchFeedback } from "@/lib/search-feedback";
 import { buildSuggestions, nextIdleNudge } from "@/lib/suggestions";
@@ -144,9 +144,11 @@ export default function Page() {
         setNudge(null);
       }
 
-      const command = parseCommand(transcript, state.lang);
-      dispatch({ type: "command", command, at: Date.now() });
-      if (command.intent === "search" && command.filters) void runSearch(command.filters);
+      // One utterance can carry several instructions.
+      const commands = parseUtterance(transcript, state.lang);
+      dispatch({ type: "commands", commands, transcript, at: Date.now() });
+      const search = commands.find((command) => command.intent === "search" && command.filters);
+      if (search?.filters) void runSearch(search.filters);
     },
     [acceptNudge, dismissNudge, markActivity, runSearch, state.lang],
   );

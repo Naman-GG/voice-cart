@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchConfirmation, parseCommand } from "@/lib/nlp/parser";
+import { matchConfirmation, parseCommand, parseUtterance } from "@/lib/nlp/parser";
 
 const parse = (text: string, lang: "en" | "hi" = "en") => parseCommand(text, lang);
 
@@ -359,5 +359,48 @@ describe("Help", () => {
     const buying = parse("I need help buying bread");
     expect(buying.items.map((item) => item.productId)).toContain("bread");
     expect(buying.intent).not.toBe("help");
+  });
+});
+
+describe("Compound utterances", () => {
+  it("splits a remove and an add into two commands", () => {
+    const parts = parseUtterance("remove paneer add tofu");
+    expect(parts.map((part) => part.intent)).toEqual(["remove", "add"]);
+    expect(parts[0].items.map((item) => item.productId)).toEqual(["paneer"]);
+    expect(parts[1].items.map((item) => item.productId)).toEqual(["tofu"]);
+  });
+
+  it("handles the conjunction form in either order", () => {
+    const first = parseUtterance("remove milk and add bread");
+    expect(first.map((part) => part.intent)).toEqual(["remove", "add"]);
+    expect(first[1].items[0].productId).toBe("bread");
+
+    const second = parseUtterance("add bread and remove milk");
+    expect(second.map((part) => part.intent)).toEqual(["add", "remove"]);
+    expect(second[0].items[0].productId).toBe("bread");
+    expect(second[1].items[0].productId).toBe("milk");
+  });
+
+  it("keeps quantities with the right clause", () => {
+    const parts = parseUtterance("delete paneer, add 2 kg tofu and 6 eggs");
+    expect(parts.map((part) => part.intent)).toEqual(["remove", "add"]);
+    expect(parts[1].items.map((item) => item.productId)).toEqual(["tofu", "eggs"]);
+    expect(parts[1].items[0]).toMatchObject({ quantity: 2, unit: "kg" });
+    expect(parts[1].items[1]).toMatchObject({ quantity: 6 });
+  });
+
+  it("works in Hindi", () => {
+    const parts = parseUtterance("पनीर हटाओ और टोफू जोड़ो", "hi");
+    expect(parts.map((part) => part.intent)).toEqual(["remove", "add"]);
+    expect(parts[0].items[0].productId).toBe("paneer");
+    expect(parts[1].items[0].productId).toBe("tofu");
+  });
+
+  it("leaves a single instruction as one command", () => {
+    // Repeated verbs of the same kind are already one multi-item command.
+    expect(parseUtterance("add milk and bread and 6 eggs")).toHaveLength(1);
+    expect(parseUtterance("add milk and add bread")).toHaveLength(1);
+    expect(parseUtterance("find toothpaste under $5")).toHaveLength(1);
+    expect(parseUtterance("remove milk")).toHaveLength(1);
   });
 });

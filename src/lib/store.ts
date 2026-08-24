@@ -48,6 +48,7 @@ export interface AppState {
 export type Action =
   | { type: "hydrate"; payload: Partial<AppState> }
   | { type: "command"; command: ParsedCommand; at: number }
+  | { type: "commands"; commands: ParsedCommand[]; transcript: string; at: number }
   | { type: "add-product"; productId: string; at: number }
   | { type: "remove-row"; rowId: string }
   | { type: "change-quantity"; rowId: string; delta: number }
@@ -390,6 +391,9 @@ export function applyCommand(state: AppState, command: ParsedCommand, at: number
   }
 }
 
+/** Worst-first, so one failure inside a compound command still shows. */
+const TONE_SEVERITY: Record<FeedbackTone, number> = { success: 0, info: 1, warning: 2, error: 3 };
+
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "hydrate":
@@ -416,6 +420,52 @@ export function reducer(state: AppState, action: Action): AppState {
             transcript: action.command.transcript,
             intent: action.command.intent,
             tone: result.feedback.tone,
+            at: action.at,
+          },
+          ...state.log,
+        ].slice(0, 25),
+      };
+    }
+
+    case "commands": {
+      // One utterance, several instructions: "remove paneer and add tofu".
+      if (!action.commands.length) return state;
+      if (action.commands.length === 1) {
+        return reducer(state, { type: "command", command: action.commands[0], at: action.at });
+      }
+
+      const snapshot = { items: state.items, history: state.history };
+      let items = state.items;
+      let history = state.history;
+      let search = state.search;
+      const messages: Record<Lang, string[]> = { en: [], hi: [] };
+      let tone: FeedbackTone = "success";
+
+      for (const command of action.commands) {
+        const result = applyCommand({ ...state, items, history }, command, action.at);
+        items = result.items;
+        history = result.history;
+        if (result.search !== undefined) search = result.search;
+        messages.en.push(result.feedback.message.en);
+        messages.hi.push(result.feedback.message.hi);
+        if (TONE_SEVERITY[result.feedback.tone] > TONE_SEVERITY[tone]) tone = result.feedback.tone;
+      }
+
+      const mutated = items !== state.items || history !== state.history;
+      return {
+        ...state,
+        items,
+        history,
+        search,
+        helpOpen: false,
+        feedback: { tone, message: { en: messages.en.join(" "), hi: messages.hi.join(" ") } },
+        past: mutated ? snapshot : state.past,
+        log: [
+          {
+            id: `${action.at}-${state.log.length}`,
+            transcript: action.transcript,
+            intent: action.commands.map((command) => command.intent).join(" + "),
+            tone,
             at: action.at,
           },
           ...state.log,

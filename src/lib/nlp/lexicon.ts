@@ -98,7 +98,7 @@ export const INTENT_PATTERNS: { intent: Intent; patterns: RegExp[] }[] = [
   {
     intent: "search",
     patterns: [
-      /\b(find|search( for)?|look for|show me|do you have|any)\b/,
+      /\b(find|search( for)?|look for|show me|do you have)\b/,
       /\b(price|cost|how much (is|are|does))\b/,
       /(ढूंढ\s*ो?|खोज\s*ो?|सर्च\s*कर|कीमत|दाम|भाव|कितने\s*(का|की|के))/,
     ],

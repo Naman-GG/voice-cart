@@ -40,7 +40,7 @@ export interface VoiceCapture {
 }
 
 /** Voice-activity tuning, in milliseconds unless noted. */
-const SPEECH_ONSET_MS = 70; // sustained loudness before a clip opens
+const SPEECH_ONSET_MS = 55; // sustained loudness before a clip opens
 const SILENCE_TO_CLOSE = 700;
 const MIN_CLIP = 250;
 const MAX_CLIP = 20_000;
@@ -59,8 +59,14 @@ const MAX_CLIP = 20_000;
 const FLOOR_ADAPT = 0.05;
 /** Faster while warming up, so the first estimate lands quickly. */
 const FLOOR_ADAPT_WARMUP = 0.2;
-const THRESHOLD_GAIN = 1.5;
-const THRESHOLD_MARGIN = 0.035;
+/*
+ * Measured with the constraints this hook uses (auto gain off): a quiet room
+ * sits around 0.004, p90 0.008. The earlier margin of 0.035 was tuned against
+ * auto-gain-inflated readings near 0.09 and put the bar about ten times above
+ * the room, which missed ordinary speech.
+ */
+const THRESHOLD_GAIN = 1.8;
+const THRESHOLD_MARGIN = 0.014;
 /** Hard ceiling: the bar can never rise above ordinary speech. */
 const MAX_THRESHOLD = 0.18;
 /** Close a tap-to-talk clip that never hears anything. */
@@ -71,10 +77,10 @@ const NO_SPEECH_LEAD_IN = 8_000;
  * transients through. Kept low enough that a one-word reply like "yes" or
  * "हाँ" still qualifies.
  */
-const MIN_LOUD_MS = 170;
+const MIN_LOUD_MS = 130;
 /** Ignore gaps longer than this between level reports (tab was suspended). */
 const MAX_SAMPLE_GAP = 120;
-const MIN_THRESHOLD = 0.018;
+const MIN_THRESHOLD = 0.011;
 /**
  * Room reverb of the assistant's own voice outlives the utterance itself,
  * but only just: echo cancellation handles the rest. Anything longer reads as
@@ -151,7 +157,7 @@ export function useVoiceCapture({
   const silenceSinceRef = useRef<number | null>(null);
   const loudRunMsRef = useRef(0);
   const lastSampleAtRef = useRef(0);
-  const noiseFloorRef = useRef(0.04);
+  const noiseFloorRef = useRef(0.006);
   /** Loudest level seen during the current clip. */
   const clipPeakRef = useRef(0);
   /** Accumulated milliseconds above threshold during the current clip. */
