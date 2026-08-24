@@ -80,7 +80,7 @@ export const INTENT_PATTERNS: { intent: Intent; patterns: RegExp[] }[] = [
       /\b(clear|empty|reset|wipe)( out| up)?( my| the)? (list|cart|everything|all)\b/,
       /\b(delete|remove) (everything|all( the)? items|the whole list)\b/,
       /\bstart (over|fresh|a new list)\b/,
-      /(पूरी लिस्ट (हटाओ|खाली|साफ))|(सब कुछ (हटाओ|मिटाओ))|(लिस्ट (खाली|साफ) कर)/,
+      /(पूरी\s*लिस्ट\s*(हटा\s*ओ|खाली|साफ))|(सब\s*कुछ\s*(हटा\s*ओ|मिटा\s*ओ))|(लिस्ट\s*(खाली|साफ)\s*कर)/,
     ],
   },
   {
@@ -89,7 +89,7 @@ export const INTENT_PATTERNS: { intent: Intent; patterns: RegExp[] }[] = [
       /\bwhat(s| is| are)?( on| in)? my (list|cart)\b/,
       /\b(read|show|tell me|say)( me)?( out)?( my| the)? (list|cart|items)\b/,
       /\bwhat do i (need|have to buy)\b/,
-      /(लिस्ट (में क्या|पढ़ो|बताओ|दिखाओ))|(क्या क्या (लेना|चाहिए))/,
+      /(लिस्ट\s*(में\s*क्या|पढ़ो|बता\s*ओ|दिखा\s*ओ))|(क्या\s*क्या\s*(लेना|चाहिए))/,
     ],
   },
   {
@@ -97,7 +97,7 @@ export const INTENT_PATTERNS: { intent: Intent; patterns: RegExp[] }[] = [
     patterns: [
       /\b(find|search( for)?|look for|show me|do you have|any)\b/,
       /\b(price|cost|how much (is|are|does))\b/,
-      /(ढूंढो|ढूंढ|खोजो|खोज|सर्च कर|कीमत|दाम|कितने का|कितने की)/,
+      /(ढूंढ\s*ो?|खोज\s*ो?|सर्च\s*कर|कीमत|दाम|भाव|कितने\s*(का|की|के))/,
     ],
   },
   {
@@ -109,7 +109,7 @@ export const INTENT_PATTERNS: { intent: Intent; patterns: RegExp[] }[] = [
     patterns: [
       /\b(mark|tick|check)( off| as)?( bought| done| purchased| complete)?\b/,
       /\b(i )?(already )?(bought|got|picked up|purchased)\b/,
-      /(खरीद लिया|ले लिया|हो गया|मार्क कर)/,
+      /(खरीद\s*(लिया|लिये|लिए)|ले\s*(लिया|लिये|लिए)|हो\s*गया|मार्क\s*कर|खरीद\s*चुका)/,
     ],
   },
   {
@@ -117,7 +117,7 @@ export const INTENT_PATTERNS: { intent: Intent; patterns: RegExp[] }[] = [
     patterns: [
       /\b(change|update|set|make it)\b/,
       /\b(increase|decrease|reduce)\b/,
-      /(बदल|बदलो|कर दो|कर दीजिए)/,
+      /(बदल\s*ो?|कर\s*दो|कर\s*दीजिए)/,
     ],
   },
   {
@@ -127,7 +127,7 @@ export const INTENT_PATTERNS: { intent: Intent; patterns: RegExp[] }[] = [
       /\btake (it |them )?(off|out)\b/,
       /\b(dont|do not|no longer) (need|want)\b/,
       /\bcancel\b/,
-      /(हटाओ|हटा दो|हटा दीजिए|निकालो|निकाल दो|मिटाओ|डिलीट|नहीं चाहिए|नहीं लेना)/,
+      /(हटा\s*(ओ|दो|दीजिए|दीजिये|दे)|निकाल\s*(ो|दो|दीजिए)|मिटा\s*(ओ|दो)|डिलीट|नहीं\s*(चाहिए|लेना|खरीदना))/,
     ],
   },
   {
@@ -136,7 +136,7 @@ export const INTENT_PATTERNS: { intent: Intent; patterns: RegExp[] }[] = [
       /\b(add|put|include|append)\b/,
       /\b(i )?(need|want|would like|have to (buy|get))\b/,
       /\b(buy|get|grab|pick up|order|bring|purchase)\b/,
-      /(जोड़|डाल|ऐड कर|चाहिए|लेना है|खरीदना है|लाना है|ले आना|लिस्ट में)/,
+      /(जोड़|डाल|ऐड\s*कर|चाहिए|ले(ना|ने)\s*(है|हैं)|खरीद(ना|ने)\s*(है|हैं)|लाना\s*है|ले\s*आना|लिस्ट\s*में)/,
     ],
   },
 ];

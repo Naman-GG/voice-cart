@@ -236,3 +236,71 @@ describe("Real Whisper large-v3 transcripts", () => {
     expect(result.items[0]).toMatchObject({ quantity: 2, unit: "kg" });
   });
 });
+
+describe("Quantity and units", () => {
+  it("defaults to pieces when no unit is spoken", () => {
+    // "1 g toothpaste" was nonsense; an unspoken unit means "one of these".
+    expect(parse("add toothpaste").items[0]).toMatchObject({ productId: "toothpaste", quantity: 1, unit: "piece" });
+    expect(parse("add milk").items[0]).toMatchObject({ productId: "milk", quantity: 1, unit: "piece" });
+    expect(parse("add 3 apples").items[0]).toMatchObject({ productId: "apple", quantity: 3, unit: "piece" });
+  });
+
+  it("keeps a unit whenever the shopper actually says one", () => {
+    expect(parse("add 2 kg rice").items[0].unit).toBe("kg");
+    expect(parse("add 2 litres of milk").items[0].unit).toBe("l");
+    expect(parse("add 500g paneer").items[0].unit).toBe("g");
+    expect(parse("add 2 bottles of water").items[0].unit).toBe("bottle");
+    expect(parse("एक किलो चावल जोड़ो", "hi").items[0].unit).toBe("kg");
+  });
+});
+
+/**
+ * Verbatim Hindi transcripts captured from /api/transcribe. Whisper joins or
+ * splits Hindi verbs unpredictably ("हटा दो" vs "हटादो"), conjugates them
+ * several ways, and lands its errors on vowel signs rather than consonants.
+ */
+describe("Real Hindi Whisper transcripts", () => {
+  const cases: [string, string, (string | null)[]][] = [
+    ["दूध जोड़ो", "add", ["milk"]],
+    ["मुझे दो किलो चावल चाहिए.", "add", ["rice"]],
+    ["ब्रेड हटादो।", "remove", ["bread"]],
+    ["लिस्ट में क्या है?", "read", []],
+    ["दूधपेस्ट ढूंढो.", "search", ["toothpaste"]],
+    ["5 सेब खरीदने हैं", "add", ["apple"]],
+    ["अंदि खरीद लिये।", "check", ["eggs"]],
+    ["पूरी लिस्ट हटाओ।", "clear", []],
+    ["क्याज और टमाटर चाहिए.", "add", ["onion", "tomato"]],
+    ["आधा किलो पनीर चाहिए.", "add", ["paneer"]],
+    ["चीनी की कीमत क्या है?", "search", ["sugar"]],
+  ];
+
+  for (const [transcript, intent, products] of cases) {
+    it(`handles "${transcript}"`, () => {
+      const result = parse(transcript, "hi");
+      expect(result.intent).toBe(intent);
+      expect(result.items.map((item) => item.productId)).toEqual(products);
+    });
+  }
+
+  it("reads quantities and units out of Hindi", () => {
+    expect(parse("मुझे दो किलो चावल चाहिए.", "hi").items[0]).toMatchObject({ quantity: 2, unit: "kg" });
+    expect(parse("आधा किलो पनीर चाहिए.", "hi").items[0]).toMatchObject({ quantity: 0.5, unit: "kg" });
+    expect(parse("5 सेब खरीदने हैं", "hi").items[0]).toMatchObject({ quantity: 5, unit: "piece" });
+  });
+
+  it("accepts both the joined and spaced forms of a verb", () => {
+    for (const phrase of ["ब्रेड हटा दो", "ब्रेड हटादो", "ब्रेड हटाओ", "ब्रेड निकाल दो"]) {
+      expect(parse(phrase, "hi").intent, phrase).toBe("remove");
+    }
+  });
+
+  it("matches Devanagari through a misheard vowel sign", () => {
+    // Whisper's Indic errors land on the matras, not the consonants.
+    expect(parse("अंदि जोड़ो", "hi").items[0].productId).toBe("eggs");
+    expect(parse("क्याज जोड़ो", "hi").items[0].productId).toBe("onion");
+  });
+
+  it("does not resolve a Devanagari word that matches nothing", () => {
+    expect(parse("क्ष्त्रज्ञ जोड़ो", "hi").items[0]?.productId ?? null).toBeNull();
+  });
+});

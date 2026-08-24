@@ -188,10 +188,10 @@ function parseSegment(segment: string, intent: Intent): ParsedItem | null {
   const match = matchProduct(tokens);
   if (match) {
     const product = match.product;
-    const spokenUnit = quantityResult.unit;
-    const hasCount = quantityResult.quantity !== undefined;
-    const weightish = product.unit === "kg" || product.unit === "g" || product.unit === "l" || product.unit === "ml" || product.unit === "dozen";
-    const unit: Unit = spokenUnit ?? (hasCount && weightish ? "piece" : product.unit);
+    // Only an explicitly spoken unit survives. Falling back to the catalog
+    // unit produced nonsense like "1 g toothpaste"; a shopper who does not
+    // say a unit means "one of these".
+    const unit: Unit = quantityResult.unit ?? "piece";
     return {
       productId: product.id,
       name: product.name.en,

@@ -5,7 +5,7 @@ import { CommandBar } from "@/components/CommandBar";
 import { FeedbackBanner } from "@/components/FeedbackBanner";
 import { Header } from "@/components/Header";
 import { IdleNudge } from "@/components/IdleNudge";
-import { MicButton } from "@/components/MicButton";
+import { VoiceControls } from "@/components/VoiceControls";
 import { SearchPanel } from "@/components/SearchPanel";
 import { ShoppingList } from "@/components/ShoppingList";
 import { SuggestionRail } from "@/components/SuggestionRail";
@@ -63,6 +63,17 @@ export default function Page() {
   const markActivity = useCallback(() => {
     lastActivityRef.current = Date.now();
   }, []);
+
+  const toggleHandsFree = useCallback(
+    (next: boolean) => {
+      markActivity();
+      // Re-arming refreshes the nag budget for a new session.
+      promptCountRef.current = 0;
+      if (!next) setNudge(null);
+      setHandsFree(next);
+    },
+    [markActivity],
+  );
 
   useEffect(() => {
     dispatch({ type: "hydrate", payload: { ...loadPersisted(), hydratedAt: Date.now() } });
@@ -237,22 +248,14 @@ export default function Page() {
       <Header
         lang={state.lang}
         speakReplies={state.speakReplies}
-        handsFree={handsFree}
         onLangChange={(lang) => dispatch({ type: "set-lang", lang })}
         onSpeakChange={(value) => dispatch({ type: "set-speak", value })}
-        onHandsFreeChange={(value) => {
-          markActivity();
-          // Re-arming hands-free refreshes the nag budget for a new session.
-          promptCountRef.current = 0;
-          if (!value) setNudge(null);
-          setHandsFree(value);
-        }}
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
         <div className="flex min-w-0 flex-col gap-5">
           <section className="rounded-3xl border border-line bg-surface px-5 py-7 shadow-[var(--shadow)]">
-            <MicButton
+            <VoiceControls
               status={capture.status}
               speaking={speaking}
               level={capture.level}
@@ -260,10 +263,11 @@ export default function Page() {
               supported={capture.supported}
               lang={state.lang}
               lastTranscript={state.log[0]?.transcript ?? null}
-              onToggle={() => {
+              onMicToggle={() => {
                 markActivity();
                 capture.toggle();
               }}
+              onHandsFreeToggle={() => toggleHandsFree(!handsFree)}
             />
             {!capture.supported && hydrated && (
               <p className="mx-auto mt-4 max-w-sm text-center text-xs leading-relaxed text-text-muted">

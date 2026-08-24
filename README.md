@@ -32,7 +32,7 @@ Two deliberately different halves:
   sharpen recall further.
 - **Understanding is local and deterministic.** Once there is a transcript, intent
   parsing is a **rule-based NLP pipeline** written from scratch — no LLM in the loop.
-  That keeps interpretation free, instant, and covered by **72 unit tests**.
+  That keeps interpretation free, instant, and covered by **95 unit tests**.
 
 ---
 
@@ -41,9 +41,13 @@ Two deliberately different halves:
 ### 1. Voice input
 - **Whisper large-v3** transcription via Groq, prompted with the app's own grocery
   vocabulary so terms like *atta*, *besan* and *shimla mirch* come back correctly.
-- **Hands-free voice activation** (`∞`). An analyser node watches the input level
-  against an adaptive noise floor: speech opens a clip, a second of silence closes it
-  and sends it for transcription. No tapping, no wake word.
+- **Hands-free voice activation** (`∞`), sitting right beside the mic. Activating
+  either control collapses the other, so whichever mode is running always has one
+  obvious off switch. An audio-thread worklet watches the input level against an
+  adaptive noise floor: speech opens a clip, a short silence closes it and sends it
+  for transcription. No tapping, no wake word. It releases the mic after 60 seconds
+  of silence, and keeps listening across tab switches — detection runs on the audio
+  thread precisely because `requestAnimationFrame` is suspended in a hidden tab.
 - **Barge-in protection** — the microphone is muted while the assistant is speaking,
   plus a short grace period afterwards, so it never transcribes its own voice.
 - **Push-to-talk** as the alternative: tap the orb, speak, tap again. The mic is
@@ -53,7 +57,11 @@ Two deliberately different halves:
   `Add milk` · `I need milk` · `I want to buy milk` · `grab some milk` · `milk`
 - **Multilingual**: English and Hindi. Hindi is understood in Devanagari
   (`दूध जोड़ो`) *and* in romanised Hinglish (`do kilo chawal chahiye`). The whole UI,
-  the spoken replies and the suggestion copy switch language too.
+  the spoken replies and the suggestion copy switch language too. Hindi verbs are
+  matched whether the transcript joins or splits them (`हटा दो` / `हटादो`) and across
+  conjugations, and Devanagari nouns fall back to a **consonant-skeleton** match,
+  because Indic transcription errors land on the vowel signs rather than the
+  consonants — `अंदि` still resolves to `अंडे`.
 - **Spoken replies** via speech synthesis, with quality-ranked voice selection.
 - Keyboard shortcut: press <kbd>M</kbd> to toggle the microphone.
 
@@ -69,9 +77,11 @@ floods the rail:
 | **Complements** | "Pasta sauce goes well with pasta." |
 
 **Proactive prompts.** In hands-free mode, ten seconds of silence makes the assistant
-offer something out loud — "You usually buy milk. Want it on the list?" — ranked by how
-often you actually buy it. Answer by voice (`yes` / `नहीं`) or by tapping the card. It
-never repeats an offer and stops after four prompts a session.
+offer something out loud — "You usually buy milk. Want it on the list?" — drawn by
+*weighted* random choice, so an item you buy nine times is far likelier than one you
+bought once but never certain. A purely ranked pick suggested the same thing every
+session, which reads as broken rather than smart. Answer by voice (`yes` / `नहीं`) or by
+tapping the card. It never repeats an offer and stops after four prompts a session.
 
 Cadence is *learned*: if you actually buy rice every 4 days, that beats the catalog's
 30-day default. Items already on the list are never suggested.
@@ -81,7 +91,9 @@ Cadence is *learned*: if you actually buy rice every 4 days, that beats the cata
   `I bought the eggs`, `clear my list`.
 - **Automatic categorisation** into 12 supermarket aisles, sorted in walking order.
 - **Quantities and units** — `Add 2 bottles of water`, `Buy 5 oranges`, `add 500g paneer`,
-  `दो लीटर दूध`. Repeat additions merge (`2 bottles` + `3 bottles` = `5 bottles`).
+  `दो लीटर दूध`. Only a unit you actually say is kept; everything else counts in pieces,
+  so `add toothpaste` reads as one toothpaste rather than "1 g toothpaste". Repeat
+  additions merge (`2 bottles` + `3 bottles` = `5 bottles`).
 - **Multi-item utterances** — `add bread and butter and 6 eggs` adds three items.
 - Single-step **undo**, running **cost estimate**, and per-item **substitute swap**.
 - The list is saved to `localStorage`, so it survives a refresh.
@@ -127,7 +139,7 @@ npm run dev          # http://localhost:3000
 ```
 
 ```bash
-npm test             # 72 unit tests (Vitest)
+npm test             # 95 unit tests (Vitest)
 npm run typecheck    # tsc --noEmit
 npm run lint         # eslint
 npm run build        # production build

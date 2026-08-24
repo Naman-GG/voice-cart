@@ -1,5 +1,5 @@
 import type { CategoryId, Lang, Product, Unit } from "./types";
-import { normalize, singularize } from "./nlp/normalize";
+import { devanagariSkeleton, hasDevanagari, normalize, singularize } from "./nlp/normalize";
 
 export interface CategoryMeta {
   id: CategoryId;
@@ -306,6 +306,26 @@ export const MAX_ALIAS_WORDS = Array.from(ALIAS_INDEX.keys()).reduce(
   (max, key) => Math.max(max, key.split(" ").length),
   1,
 );
+
+/**
+ * Devanagari consonant skeleton -> product id, used as a last-resort match.
+ * A skeleton claimed by more than one product maps to null so an ambiguous
+ * slip is never silently resolved to the wrong item.
+ */
+export const SKELETON_INDEX: ReadonlyMap<string, string | null> = (() => {
+  const index = new Map<string, string | null>();
+  for (const product of CATALOG) {
+    for (const alias of product.aliases) {
+      if (!hasDevanagari(alias)) continue;
+      const skeleton = devanagariSkeleton(normalize(alias));
+      if (skeleton.length < 2) continue;
+      const existing = index.get(skeleton);
+      if (existing === undefined) index.set(skeleton, product.id);
+      else if (existing !== product.id) index.set(skeleton, null);
+    }
+  }
+  return index;
+})();
 
 export const ALL_BRANDS: string[] = Array.from(
   new Set(CATALOG.flatMap((product) => product.brands)),

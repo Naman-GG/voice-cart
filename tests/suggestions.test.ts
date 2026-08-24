@@ -121,15 +121,38 @@ describe("proactive idle prompts", () => {
     expect(frequentlyBought([], []).length).toBeGreaterThan(0);
   });
 
-  it("offers the most frequent item first, then never repeats it", () => {
-    const offered = new Set<string>();
-    const first = nextIdleNudge([], history, [], offered);
+  it("favours the most frequent item when the draw is low", () => {
+    // milk has 9 purchases against bread's 4, so it owns the front of the
+    // weighted range: a near-zero draw must land on it.
+    const first = nextIdleNudge([], history, [], new Set(), () => 0);
     expect(first?.productId).toBe("milk");
     expect(first?.reason.en).toMatch(/usually buy/i);
+  });
 
-    offered.add(first!.productId);
-    const second = nextIdleNudge([], history, [], offered);
-    expect(second?.productId).toBe("bread");
+  it("never repeats an item that was already offered", () => {
+    const offered = new Set(["milk"]);
+    const next = nextIdleNudge([], history, [], offered, () => 0);
+    expect(next?.productId).not.toBe("milk");
+  });
+
+  it("does not offer the same item every session", () => {
+    // The old version was deterministic and always suggested bread.
+    const picks = new Set<string>();
+    for (let i = 0; i < 12; i += 1) {
+      const draw = i / 12;
+      const nudge = nextIdleNudge([], [], [], new Set(), () => draw);
+      if (nudge) picks.add(nudge.productId);
+    }
+    expect(picks.size).toBeGreaterThan(3);
+  });
+
+  it("still weights a heavy buyer above a light one across many draws", () => {
+    const counts: Record<string, number> = {};
+    for (let i = 0; i < 200; i += 1) {
+      const nudge = nextIdleNudge([], history, [], new Set(), () => i / 200);
+      if (nudge) counts[nudge.productId] = (counts[nudge.productId] ?? 0) + 1;
+    }
+    expect(counts.milk).toBeGreaterThan(counts.bread ?? 0);
   });
 
   it("falls back to the recommender once frequent items run out", () => {

@@ -1,6 +1,6 @@
-import { ALIAS_INDEX, MAX_ALIAS_WORDS, PRODUCTS_BY_ID } from "../catalog";
+import { ALIAS_INDEX, MAX_ALIAS_WORDS, PRODUCTS_BY_ID, SKELETON_INDEX } from "../catalog";
 import type { Product } from "../types";
-import { editDistance, normalize, singularize } from "./normalize";
+import { devanagariSkeleton, editDistance, hasDevanagari, normalize, singularize } from "./normalize";
 
 export interface ProductMatch {
   product: Product;
@@ -12,6 +12,38 @@ export interface ProductMatch {
 }
 
 const ALIAS_KEYS = Array.from(ALIAS_INDEX.keys());
+const SKELETON_KEYS = Array.from(SKELETON_INDEX.keys());
+
+/**
+ * Last resort for Devanagari: compare consonant skeletons, so a misheard
+ * vowel sign still resolves. Only unambiguous skeletons are accepted.
+ */
+function matchBySkeleton(tokens: string[]): ProductMatch | null {
+  for (let start = 0; start < tokens.length; start += 1) {
+    for (let span = Math.min(2, tokens.length - start); span >= 1; span -= 1) {
+      const phrase = tokens.slice(start, start + span).join(" ");
+      if (!hasDevanagari(phrase)) continue;
+      const skeleton = devanagariSkeleton(phrase);
+      if (skeleton.length < 2) continue;
+
+      const exact = SKELETON_INDEX.get(skeleton);
+      if (exact) {
+        const product = PRODUCTS_BY_ID.get(exact);
+        if (product) return { product, start, end: start + span, confidence: 0.75 };
+      }
+
+      for (const key of SKELETON_KEYS) {
+        if (Math.abs(key.length - skeleton.length) > 1) continue;
+        if (editDistance(skeleton, key, 1) > 1) continue;
+        const id = SKELETON_INDEX.get(key);
+        if (!id) continue; // null marks an ambiguous skeleton
+        const product = PRODUCTS_BY_ID.get(id);
+        if (product) return { product, start, end: start + span, confidence: 0.6 };
+      }
+    }
+  }
+  return null;
+}
 
 function lookup(phrase: string): string | undefined {
   return (
@@ -57,7 +89,7 @@ export function matchProduct(tokens: string[]): ProductMatch | null {
       }
     }
   }
-  return best;
+  return best ?? matchBySkeleton(tokens);
 }
 
 /** Matches a product from a raw string (used by search and quick-add chips). */

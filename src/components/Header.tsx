@@ -6,20 +6,11 @@ import type { Lang } from "@/lib/types";
 interface Props {
   lang: Lang;
   speakReplies: boolean;
-  handsFree: boolean;
   onLangChange: (lang: Lang) => void;
   onSpeakChange: (value: boolean) => void;
-  onHandsFreeChange: (value: boolean) => void;
 }
 
-export function Header({
-  lang,
-  speakReplies,
-  handsFree,
-  onLangChange,
-  onSpeakChange,
-  onHandsFreeChange,
-}: Props) {
+export function Header({ lang, speakReplies, onLangChange, onSpeakChange }: Props) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div>
@@ -53,15 +44,6 @@ export function Header({
             </button>
           ))}
         </div>
-
-        <Toggle
-          active={handsFree}
-          onClick={() => onHandsFreeChange(!handsFree)}
-          label={T.handsFree[lang]}
-          title={T.handsFreeHint[lang]}
-        >
-          ∞
-        </Toggle>
 
         <Toggle
           active={speakReplies}

@@ -68,6 +68,8 @@ export const T = {
   statusTranscribing: { en: "Transcribing with Whisper…", hi: "व्हिस्पर से समझ रहे हैं…" },
   statusSpeaking: { en: "Speaking…", hi: "बोल रहे हैं…" },
   handsFree: { en: "Hands-free", hi: "हैंड्स-फ़्री" },
+  handsFreeStop: { en: "Stop listening", hi: "सुनना बंद करें" },
+  handsFreeIdleHint: { en: "or go hands-free", hi: "या हैंड्स-फ़्री चालू करें" },
   handsFreeHint: {
     en: "Hands-free is on — speak any time, no tapping needed.",
     hi: "हैंड्स-फ़्री चालू है — कभी भी बोलिए, दबाने की ज़रूरत नहीं।",

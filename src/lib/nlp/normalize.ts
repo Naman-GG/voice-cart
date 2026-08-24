@@ -68,3 +68,19 @@ export function fuzzyEquals(a: string, b: string): boolean {
 export function hasDevanagari(input: string): boolean {
   return /[ऀ-ॿ]/.test(input);
 }
+
+/** Devanagari combining marks: vowel signs, anusvara, nukta, virama. */
+const DEVANAGARI_MARKS = /[\u0900-\u0903\u093A-\u094D\u0951-\u0957\u0962\u0963\u200C\u200D]/g;
+
+/**
+ * Consonant skeleton of a Devanagari word, with vowel signs stripped.
+ *
+ * Speech-to-text slips in Indic scripts land overwhelmingly on the vowel
+ * marks rather than the consonants — "अंडे" comes back as "अंदि" — and raw
+ * code-point edit distance is a poor fit because a four-character Devanagari
+ * word carries as much information as a much longer Latin one. Comparing
+ * skeletons recovers those cases without loosening matching generally.
+ */
+export function devanagariSkeleton(text: string): string {
+  return text.replace(DEVANAGARI_MARKS, "");
+}

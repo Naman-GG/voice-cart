@@ -4,7 +4,10 @@ import type { HistoryEntry, ListItem, Product, Suggestion } from "./types";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Items worth suggesting to a brand-new user with no history yet. */
-const STARTER_IDS = ["milk", "bread", "eggs", "onion", "rice", "tea"];
+const STARTER_IDS = [
+  "milk", "bread", "eggs", "onion", "rice", "tea",
+  "banana", "tomato", "potato", "sugar", "atta", "curd",
+];
 
 interface SuggestionInput {
   list: ListItem[];
@@ -196,19 +199,45 @@ export function frequentlyBought(list: ListItem[], history: HistoryEntry[], limi
 }
 
 /**
+ * Weighted random pick: a product bought nine times is far likelier than one
+ * bought once, but never certain. Without this the assistant offers the same
+ * item every session — always bread — which reads as broken rather than smart.
+ */
+function weightedPick(products: Product[], history: HistoryEntry[], random: () => number): Product {
+  const weights = products.map((product) => {
+    const seen = history.find((entry) => entry.productId === product.id);
+    return (seen?.purchases ?? 0) + 1;
+  });
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let ticket = random() * total;
+  for (let i = 0; i < products.length; i += 1) {
+    ticket -= weights[i];
+    if (ticket <= 0) return products[i];
+  }
+  return products[products.length - 1];
+}
+
+/**
  * Picks the single item to offer out loud after a stretch of silence.
  * Prefers what the shopper usually buys, then anything else the recommender
  * surfaced, and never repeats something already offered this session.
+ *
+ * `random` is injectable so the choice can be asserted in tests.
  */
 export function nextIdleNudge(
   list: ListItem[],
   history: HistoryEntry[],
   suggestions: Suggestion[],
   alreadyOffered: ReadonlySet<string>,
+  random: () => number = Math.random,
 ): Suggestion | null {
-  for (const product of frequentlyBought(list, history, 8)) {
-    if (alreadyOffered.has(product.id)) continue;
-    const seen = history.find((entry) => entry.productId === product.id);
+  const candidates = frequentlyBought(list, history, 8).filter(
+    (product) => !alreadyOffered.has(product.id),
+  );
+
+  if (candidates.length) {
+    const product = weightedPick(candidates, history, random);
+    const seen = history.some((entry) => entry.productId === product.id);
     return {
       id: `idle:${product.id}`,
       productId: product.id,
@@ -226,5 +255,7 @@ export function nextIdleNudge(
     };
   }
 
-  return suggestions.find((suggestion) => !alreadyOffered.has(suggestion.productId)) ?? null;
+  const fresh = suggestions.filter((suggestion) => !alreadyOffered.has(suggestion.productId));
+  if (!fresh.length) return null;
+  return fresh[Math.min(fresh.length - 1, Math.floor(random() * fresh.length))];
 }
