@@ -35,6 +35,10 @@ export function ShoppingList({
   const [openSwap, setOpenSwap] = useState<string | null>(null);
   const groups = groupByCategory(items);
   const total = estimatedTotal(items);
+  // Numbered continuously down the page, the way you would write a list.
+  const serials = new Map(
+    groups.flatMap((group) => group.items).map((item, index) => [item.id, index + 1]),
+  );
   const rowCount = groups.reduce((sum, group) => sum + group.items.length + 1, 0);
 
   return (
@@ -68,7 +72,7 @@ export function ShoppingList({
       </header>
 
       <div
-        className="ruled relative"
+        className="ruled margin-rule relative"
         style={{ minHeight: `calc(var(--rule-step) * ${Math.max(MIN_RULES, rowCount + 2)})` }}
       >
         {items.length === 0 ? (
@@ -94,8 +98,11 @@ export function ShoppingList({
                       <li key={item.id} className="animate-write">
                         <div className="rule-row group gap-3 pr-4">
                           {/* Quantity, written in the margin like a real list. */}
-                          <span className="w-[var(--margin-x)] shrink-0 pr-3 text-right font-mono text-sm tabular-nums text-ink">
-                            {Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2)}
+                          <span
+                            aria-hidden
+                            className="w-[var(--margin-x)] shrink-0 pr-3 text-right font-mono text-[13px] tabular-nums text-pencil"
+                          >
+                            {serials.get(item.id)}.
                           </span>
 
                           <span className="flex min-w-0 flex-1 items-baseline gap-2 pl-1">

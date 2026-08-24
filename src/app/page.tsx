@@ -255,7 +255,7 @@ export default function Page() {
 
       <div className="mt-7 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.78fr)] lg:items-start lg:gap-10">
         {/* The sheet: the mic that writes, and the list it writes on. */}
-        <div className="sheet sheet-margin min-w-0 rounded-[2px]">
+        <div className="sheet min-w-0 rounded-[2px]">
           <VoiceControls
             status={capture.status}
             speaking={speaking}

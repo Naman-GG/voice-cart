@@ -60,8 +60,12 @@ body {
   box-shadow: var(--sheet-shadow);
 }
 
-/* The red vertical margin line of an exercise book. */
-.sheet-margin::before {
+/*
+ * The red vertical margin line of an exercise book. Scoped to the ruled area:
+ * running it the full height of the sheet drew it straight through the mic,
+ * the reply notice and the list header.
+ */
+.margin-rule::before {
   content: "";
   position: absolute;
   inset-block: 0;
