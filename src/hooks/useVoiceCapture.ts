@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { LEVEL_WORKLET_SOURCE } from "./level-worklet";
 import type { Lang } from "@/lib/types";
 
 export type CaptureStatus = "off" | "opening" | "listening" | "recording" | "transcribing";
@@ -39,18 +40,20 @@ export interface VoiceCapture {
 }
 
 /** Voice-activity tuning, in milliseconds unless noted. */
-const SPEECH_FRAMES_TO_OPEN = 4; // ~65ms above threshold before we start
+const SPEECH_ONSET_MS = 70; // sustained loudness before a clip opens
 const SILENCE_TO_CLOSE = 700;
 const MIN_CLIP = 250;
 const MAX_CLIP = 20_000;
 const FLOOR_ATTACK = 0.02; // how fast the noise floor adapts
 /**
- * Frames of sustained sound a clip needs before it is worth uploading.
- * A door click or keyboard tap has a high peak but almost no duration, so
- * peak alone lets transients through. Kept low enough that a one-word reply
- * like "yes" or "हाँ" still qualifies.
+ * Sustained sound a clip needs before it is worth uploading. A door click or
+ * keyboard tap has a high peak but almost no duration, so peak alone lets
+ * transients through. Kept low enough that a one-word reply like "yes" or
+ * "हाँ" still qualifies.
  */
-const MIN_LOUD_FRAMES = 10;
+const MIN_LOUD_MS = 170;
+/** Ignore gaps longer than this between level reports (tab was suspended). */
+const MAX_SAMPLE_GAP = 120;
 const MIN_THRESHOLD = 0.018;
 /** Room reverb of the assistant's own voice outlives the utterance itself. */
 const UNMUTE_GRACE = 900;
@@ -84,9 +87,9 @@ function pickMimeType(): string {
 /**
  * Captures microphone audio and transcribes it with Whisper large-v3.
  *
- * The audio session (stream + analyser + recorder) is opened once and kept
+ * The audio session (stream + level worklet + recorder) is opened once and kept
  * warm, so only the first command pays the getUserMedia cost. In hands-free
- * mode an analyser watches input level against an adaptive noise floor:
+ * mode an audio-thread worklet watches input level against an adaptive floor:
  * speech opens a clip, a short silence closes it and posts it to
  * /api/transcribe. A tap always opens or closes a clip immediately.
  */
@@ -106,9 +109,8 @@ export function useVoiceCapture({
 
   const streamRef = useRef<MediaStream | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
+  const workletRef = useRef<AudioWorkletNode | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const frameRef = useRef<number | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   /** In-flight open, so rapid taps share one getUserMedia call. */
   const openRef = useRef<Promise<boolean> | null>(null);
@@ -118,12 +120,13 @@ export function useVoiceCapture({
   const inflightRef = useRef(0);
   const startedAtRef = useRef(0);
   const silenceSinceRef = useRef<number | null>(null);
-  const speechFramesRef = useRef(0);
+  const loudRunMsRef = useRef(0);
+  const lastSampleAtRef = useRef(0);
   const noiseFloorRef = useRef(0.01);
   /** Loudest level seen during the current clip. */
   const clipPeakRef = useRef(0);
-  /** Frames above threshold during the current clip. */
-  const clipLoudFramesRef = useRef(0);
+  /** Accumulated milliseconds above threshold during the current clip. */
+  const clipLoudMsRef = useRef(0);
   /** Detector stays disarmed until this timestamp. */
   const vadReadyAtRef = useRef(0);
   /** Last time the user actually spoke, for the hands-free idle cutoff. */
@@ -155,15 +158,19 @@ export function useVoiceCapture({
       // Re-warm after speaking: the floor was frozen while muted.
       vadReadyAtRef.current = performance.now() + UNMUTE_GRACE + VAD_WARMUP;
       noiseFloorRef.current = 0.01;
-      speechFramesRef.current = 0;
+      loudRunMsRef.current = 0;
     }
   }, [muted]);
 
   const teardown = useCallback(() => {
     if (releaseTimerRef.current) clearTimeout(releaseTimerRef.current);
     releaseTimerRef.current = null;
-    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-    frameRef.current = null;
+    const worklet = workletRef.current;
+    if (worklet) {
+      worklet.port.onmessage = null;
+      worklet.disconnect();
+    }
+    workletRef.current = null;
 
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== "inactive") {
@@ -183,7 +190,6 @@ export function useVoiceCapture({
 
     void contextRef.current?.close().catch(() => {});
     contextRef.current = null;
-    analyserRef.current = null;
     openRef.current = null;
 
     setLevel(0);
@@ -261,12 +267,12 @@ export function useVoiceCapture({
       // trip and avoids Whisper hallucinating on it.
       const threshold = Math.max(MIN_THRESHOLD, noiseFloorRef.current * 3 + 0.01);
       const silent = clipPeakRef.current < threshold;
-      const tooBrief = clipLoudFramesRef.current < MIN_LOUD_FRAMES;
+      const tooBrief = clipLoudMsRef.current < MIN_LOUD_MS;
       const drop = discard || tooShort || silent || tooBrief;
 
       recordingRef.current = false;
       silenceSinceRef.current = null;
-      speechFramesRef.current = 0;
+      loudRunMsRef.current = 0;
 
       recorder.onstop = () => {
         const chunks = chunksRef.current;
@@ -297,7 +303,7 @@ export function useVoiceCapture({
     chunksRef.current = [];
     recordingRef.current = true;
     clipPeakRef.current = 0;
-    clipLoudFramesRef.current = 0;
+    clipLoudMsRef.current = 0;
     startedAtRef.current = performance.now();
     lastSpeechAtRef.current = startedAtRef.current;
     silenceSinceRef.current = null;
@@ -343,7 +349,7 @@ export function useVoiceCapture({
       const context = new AudioContext();
       contextRef.current = context;
       // Created outside the click's task, so Chrome starts it suspended and
-      // the analyser would report pure silence until it is resumed.
+      // the worklet would report pure silence until it is resumed.
       if (context.state === "suspended") {
         try {
           await context.resume();
@@ -353,11 +359,37 @@ export function useVoiceCapture({
       }
 
       const source = context.createMediaStreamSource(stream);
-      const analyser = context.createAnalyser();
-      analyser.fftSize = 1024;
-      analyser.smoothingTimeConstant = 0.7;
-      source.connect(analyser);
-      analyserRef.current = analyser;
+
+      // Level metering runs on the audio thread. requestAnimationFrame is
+      // suspended outright in a hidden tab and background timers are clamped
+      // to one second, either of which would freeze voice detection the
+      // moment the user switches tabs.
+      let workletUrl: string | null = null;
+      try {
+        const blob = new Blob([LEVEL_WORKLET_SOURCE], { type: "application/javascript" });
+        workletUrl = URL.createObjectURL(blob);
+        await context.audioWorklet.addModule(workletUrl);
+      } catch (error) {
+        console.error("Could not start the audio level worklet", error);
+        handlersRef.current.onError("no-audio");
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        void context.close().catch(() => {});
+        contextRef.current = null;
+        setStatus("off");
+        return false;
+      } finally {
+        if (workletUrl) URL.revokeObjectURL(workletUrl);
+      }
+
+      const worklet = new AudioWorkletNode(context, "level-processor");
+      source.connect(worklet);
+      // Some engines only pull a node that reaches the destination; a muted
+      // gain keeps the graph live without playing anything back.
+      const silentSink = context.createGain();
+      silentSink.gain.value = 0;
+      worklet.connect(silentSink).connect(context.destination);
+      workletRef.current = worklet;
 
       const mimeType = pickMimeType();
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -366,18 +398,14 @@ export function useVoiceCapture({
       };
       recorderRef.current = recorder;
 
-      const samples = new Float32Array(analyser.fftSize);
-      const tick = () => {
-        frameRef.current = requestAnimationFrame(tick);
-        const node = analyserRef.current;
-        if (!node) return;
-
-        node.getFloatTimeDomainData(samples);
-        let sum = 0;
-        for (let i = 0; i < samples.length; i += 1) sum += samples[i] * samples[i];
-        const scaled = Math.min(1, Math.sqrt(sum / samples.length) * 6);
-
+      const onLevel = (rms: number) => {
+        const scaled = Math.min(1, rms * 6);
         const now = performance.now();
+        // Clamped so a suspended tab resuming cannot dump a huge delta into
+        // the sustained-speech accumulators.
+        const delta = Math.min(now - lastSampleAtRef.current, MAX_SAMPLE_GAP);
+        lastSampleAtRef.current = now;
+
         if (now - lastLevelPushRef.current > 55) {
           lastLevelPushRef.current = now;
           setLevel(scaled);
@@ -390,46 +418,49 @@ export function useVoiceCapture({
 
         const threshold = Math.max(MIN_THRESHOLD, noiseFloorRef.current * 3 + 0.01);
         const loud = scaled > threshold;
+
         if (recordingRef.current) {
           if (scaled > clipPeakRef.current) clipPeakRef.current = scaled;
-          if (loud) clipLoudFramesRef.current += 1;
-        }
+          if (loud) clipLoudMsRef.current += delta;
 
-        if (!recordingRef.current) {
-          // Track the room's noise floor only while nobody is talking.
-          noiseFloorRef.current += (scaled - noiseFloorRef.current) * FLOOR_ATTACK;
+          if (now - startedAtRef.current > MAX_CLIP) {
+            finishClip();
+            return;
+          }
           if (!vadRef.current) return;
-          if (inflightRef.current === 0 && now - lastSpeechAtRef.current > IDLE_MIC_TIMEOUT) {
-            teardown();
-            handlersRef.current.onIdleTimeout?.();
+          if (loud) {
+            silenceSinceRef.current = null;
             return;
           }
-          // Firing before the floor has settled turns room tone into a clip.
-          if (now < vadReadyAtRef.current) {
-            speechFramesRef.current = 0;
-            return;
-          }
-          speechFramesRef.current = loud ? speechFramesRef.current + 1 : 0;
-          if (speechFramesRef.current >= SPEECH_FRAMES_TO_OPEN) beginClip();
+          if (silenceSinceRef.current === null) silenceSinceRef.current = now;
+          else if (now - silenceSinceRef.current > SILENCE_TO_CLOSE) finishClip();
           return;
         }
 
-        if (now - startedAtRef.current > MAX_CLIP) {
-          finishClip();
-          return;
-        }
+        // Track the room's noise floor only while nobody is talking.
+        noiseFloorRef.current += (scaled - noiseFloorRef.current) * FLOOR_ATTACK;
         if (!vadRef.current) return;
-        if (loud) {
-          silenceSinceRef.current = null;
+
+        if (inflightRef.current === 0 && now - lastSpeechAtRef.current > IDLE_MIC_TIMEOUT) {
+          teardown();
+          handlersRef.current.onIdleTimeout?.();
           return;
         }
-        if (silenceSinceRef.current === null) silenceSinceRef.current = now;
-        else if (now - silenceSinceRef.current > SILENCE_TO_CLOSE) finishClip();
+        // Firing before the floor has settled turns room tone into a clip.
+        if (now < vadReadyAtRef.current) {
+          loudRunMsRef.current = 0;
+          return;
+        }
+        loudRunMsRef.current = loud ? loudRunMsRef.current + delta : 0;
+        if (loudRunMsRef.current >= SPEECH_ONSET_MS) beginClip();
       };
 
-      vadReadyAtRef.current = performance.now() + VAD_WARMUP;
-      lastSpeechAtRef.current = performance.now();
-      frameRef.current = requestAnimationFrame(tick);
+      worklet.port.onmessage = (event: MessageEvent<number>) => onLevel(event.data);
+
+      const openedAt = performance.now();
+      vadReadyAtRef.current = openedAt + VAD_WARMUP;
+      lastSpeechAtRef.current = openedAt;
+      lastSampleAtRef.current = openedAt;
       setStatus(restStatus());
       return true;
     })();
