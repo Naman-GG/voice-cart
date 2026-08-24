@@ -237,7 +237,7 @@ export const CATALOG: Product[] = [
   p("candy", "candy", "टॉफ़ी", ["candy", "toffee", "sweets"], "snacks", "pack", 1.5, {}),
 
   // ---------- Beverages ----------
-  p("water", "bottled water", "पानी", ["pani", "water", "mineral water", "bottled water"], "beverages", "bottle", 0.9, { repurchaseDays: 3 }),
+  p("water", "water", "पानी", ["pani", "water", "mineral water", "bottled water"], "beverages", "bottle", 0.9, { repurchaseDays: 3 }),
   p("tea", "tea", "चाय", ["chai", "tea", "tea leaves", "tea bags"], "beverages", "g", 4.2, { goesWith: ["milk", "sugar", "biscuits"], substitutes: ["green-tea", "coffee"], repurchaseDays: 25 }),
   p("green-tea", "green tea", "ग्रीन टी", ["green tea"], "beverages", "box", 5.1, { substitutes: ["tea"] }),
   p("coffee", "coffee", "कॉफ़ी", ["coffee", "kofi"], "beverages", "g", 6.8, { substitutes: ["tea"], repurchaseDays: 25 }),

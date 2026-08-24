@@ -66,7 +66,6 @@ export interface ListItem {
   brand?: string;
   /** e.g. "organic", "low fat" — captured from the utterance. */
   notes?: string;
-  checked: boolean;
   addedAt: number;
 }
 

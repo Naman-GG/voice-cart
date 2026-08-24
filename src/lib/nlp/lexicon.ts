@@ -5,7 +5,6 @@ export type Intent =
   | "remove"
   | "update_quantity"
   | "check"
-  | "uncheck"
   | "clear"
   | "search"
   | "read"
@@ -105,10 +104,7 @@ export const INTENT_PATTERNS: { intent: Intent; patterns: RegExp[] }[] = [
     ],
   },
   {
-    intent: "uncheck",
-    patterns: [/\b(uncheck|unmark|not bought|didnt (buy|get))\b/, /(वापस लिस्ट में|अनमार्क)/],
-  },
-  {
+    // "I bought the milk" takes it off the list; there is no bought state.
     intent: "check",
     patterns: [
       /\b(mark|tick|check)( off| as)?( bought| done| purchased| complete)?\b/,

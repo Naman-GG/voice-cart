@@ -12,7 +12,6 @@ interface Props {
   items: ListItem[];
   lang: Lang;
   canUndo: boolean;
-  onToggle: (rowId: string) => void;
   onRemove: (rowId: string) => void;
   onQuantity: (rowId: string, delta: number) => void;
   onAddProduct: (productId: string) => void;
@@ -27,7 +26,6 @@ export function ShoppingList({
   items,
   lang,
   canUndo,
-  onToggle,
   onRemove,
   onQuantity,
   onAddProduct,
@@ -35,9 +33,8 @@ export function ShoppingList({
   onUndo,
 }: Props) {
   const [openSwap, setOpenSwap] = useState<string | null>(null);
-  const pending = items.filter((item) => !item.checked);
   const groups = groupByCategory(items);
-  const total = estimatedTotal(pending);
+  const total = estimatedTotal(items);
   const rowCount = groups.reduce((sum, group) => sum + group.items.length + 1, 0);
 
   return (
@@ -46,8 +43,7 @@ export function ShoppingList({
         <h2 className="label text-ink">{T.yourList[lang]}</h2>
         <div className="flex items-center gap-3">
           <p className="font-mono text-[11px] text-pencil">
-            {pending.length} {T.items[lang]}
-            {items.length > pending.length && ` · ${items.length - pending.length} ${T.bought[lang]}`}
+            {items.length} {T.items[lang]}
             {total > 0 && ` · ${formatPrice(total)}`}
           </p>
           {canUndo && (
@@ -98,30 +94,14 @@ export function ShoppingList({
                       <li key={item.id} className="animate-write">
                         <div className="rule-row group gap-3 pr-4">
                           {/* Quantity, written in the margin like a real list. */}
-                          <span
-                            className={`w-[var(--margin-x)] shrink-0 pr-3 text-right font-mono text-sm tabular-nums ${
-                              item.checked ? "text-pencil" : "text-ink"
-                            }`}
-                          >
+                          <span className="w-[var(--margin-x)] shrink-0 pr-3 text-right font-mono text-sm tabular-nums text-ink">
                             {Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2)}
                           </span>
 
-                          <button
-                            type="button"
-                            role="checkbox"
-                            aria-checked={item.checked}
-                            onClick={() => onToggle(item.id)}
-                            className="flex min-w-0 flex-1 items-baseline gap-2 pl-1 text-left"
-                          >
-                            <span
-                              className={`truncate text-[15px] ${
-                                item.checked ? "struck" : "text-ink decoration-pencil/50 underline-offset-4 group-hover:underline"
-                              }`}
-                            >
-                              {name}
-                            </span>
+                          <span className="flex min-w-0 flex-1 items-baseline gap-2 pl-1">
+                            <span className="truncate text-[15px] text-ink">{name}</span>
                             {meta && <span className="truncate font-mono text-[11px] text-pencil">{meta}</span>}
-                          </button>
+                          </span>
 
                           {product && (
                             <span className="shrink-0 font-mono text-[11px] tabular-nums text-pencil">

@@ -50,7 +50,6 @@ export type Action =
   | { type: "command"; command: ParsedCommand; at: number }
   | { type: "add-product"; productId: string; at: number }
   | { type: "remove-row"; rowId: string }
-  | { type: "toggle-row"; rowId: string }
   | { type: "change-quantity"; rowId: string; delta: number }
   | { type: "clear" }
   | { type: "undo" }
@@ -104,7 +103,10 @@ export function estimatedTotal(items: ListItem[]): number {
   return items.reduce((sum, item) => {
     const product = getProduct(item.productId);
     if (!product) return sum;
-    const multiplier = item.unit === product.unit ? item.quantity : Math.max(item.quantity, 1);
+    // Catalog prices are per catalog unit, so quantity only multiplies when
+    // the units agree. "6 eggs" is six of a dozen-priced product, not six
+    // dozen, and counting it six times put $19.20 of eggs in the total.
+    const multiplier = item.unit === product.unit ? item.quantity : 1;
     return sum + salePrice(product) * multiplier;
   }, 0);
 }
@@ -133,7 +135,6 @@ function addItem(items: ListItem[], parsed: ParsedItem, at: number): ListItem[] 
       unit: parsed.unit,
       brand: parsed.brand,
       notes: parsed.notes,
-      checked: false,
       addedAt: at,
     };
     return [...items, next];
@@ -147,7 +148,6 @@ function addItem(items: ListItem[], parsed: ParsedItem, at: number): ListItem[] 
           unit: parsed.unit,
           brand: parsed.brand ?? item.brand,
           notes: parsed.notes ?? item.notes,
-          checked: false,
         },
   );
 }
@@ -287,17 +287,16 @@ export function applyCommand(state: AppState, command: ParsedCommand, at: number
       };
     }
 
-    case "check":
-    case "uncheck": {
+    case "check": {
+      // Bought means done: the item leaves the list.
       if (!command.items.length) return { items, history, feedback: NOT_UNDERSTOOD };
-      const checked = command.intent === "check";
       const names: Record<Lang, string[]> = { en: [], hi: [] };
       for (const parsed of command.items) {
         const row = findRow(items, parsed);
         if (!row) continue;
-        items = items.map((item) => (item.id === row.id ? { ...item, checked } : item));
         names.en.push(itemLabel(row, "en"));
         names.hi.push(itemLabel(row, "hi"));
+        items = items.filter((item) => item.id !== row.id);
       }
       if (!names.en.length) {
         return {
@@ -309,9 +308,11 @@ export function applyCommand(state: AppState, command: ParsedCommand, at: number
       return {
         items,
         history,
-        feedback: checked
-          ? feedbackFor("success", `Marked ${joinNames(names.en, "en")} as bought.`, `${joinNames(names.hi, "hi")} खरीदा हुआ मार्क कर दिया।`)
-          : feedbackFor("success", `Moved ${joinNames(names.en, "en")} back to the list.`, `${joinNames(names.hi, "hi")} वापस लिस्ट में डाल दिया।`),
+        feedback: feedbackFor(
+          "success",
+          `Got ${joinNames(names.en, "en")} — taken off the list.`,
+          `${joinNames(names.hi, "hi")} लिस्ट से हटा दिया।`,
+        ),
       };
     }
 
@@ -340,7 +341,7 @@ export function applyCommand(state: AppState, command: ParsedCommand, at: number
     }
 
     case "read": {
-      const pending = items.filter((item) => !item.checked);
+      const pending = items;
       if (!pending.length) {
         return { items, history, feedback: feedbackFor("info", "Your list is empty.", "आपकी लिस्ट खाली है।") };
       }
@@ -452,14 +453,6 @@ export function reducer(state: AppState, action: Action): AppState {
         past: { items: state.items, history: state.history },
         items: state.items.filter((item) => item.id !== action.rowId),
         feedback: null,
-      };
-
-    case "toggle-row":
-      return {
-        ...state,
-        items: state.items.map((item) =>
-          item.id === action.rowId ? { ...item, checked: !item.checked } : item,
-        ),
       };
 
     case "change-quantity":

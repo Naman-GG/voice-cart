@@ -19,7 +19,6 @@ function listItem(productId: string, overrides: Partial<ListItem> = {}): ListIte
     category: "other",
     quantity: 1,
     unit: "piece",
-    checked: false,
     addedAt: NOW,
     ...overrides,
   };

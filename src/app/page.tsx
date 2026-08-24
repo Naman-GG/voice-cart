@@ -300,7 +300,6 @@ export default function Page() {
               items={state.items}
               lang={state.lang}
               canUndo={state.past !== null}
-              onToggle={(rowId) => dispatch({ type: "toggle-row", rowId })}
               onRemove={(rowId) => dispatch({ type: "remove-row", rowId })}
               onQuantity={(rowId, delta) => dispatch({ type: "change-quantity", rowId, delta })}
               onAddProduct={addProduct}

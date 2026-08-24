@@ -24,7 +24,6 @@ export const T = {
   noResults: { en: "No matching products", hi: "कोई उत्पाद नहीं मिला" },
   clearSearch: { en: "Clear search", hi: "खोज हटाएँ" },
   items: { en: "items", hi: "चीज़ें" },
-  bought: { en: "bought", hi: "खरीदा" },
   estimatedTotal: { en: "Est. total", hi: "अनुमानित कुल" },
   clearAll: { en: "Clear all", hi: "सब हटाएँ" },
   undo: { en: "Undo", hi: "वापस" },

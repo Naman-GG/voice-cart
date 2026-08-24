@@ -45,11 +45,11 @@ describe("list management via voice", () => {
     expect(state.feedback?.tone).toBe("warning");
   });
 
-  it("marks items as bought without deleting them", () => {
+  it("takes an item off the list once it is bought", () => {
     let state = run(initialState, "add eggs");
     state = run(state, "I bought the eggs");
-    expect(state.items[0].checked).toBe(true);
-    expect(state.items).toHaveLength(1);
+    expect(state.items).toHaveLength(0);
+    expect(state.feedback?.tone).toBe("success");
   });
 
   it("updates a quantity", () => {
@@ -92,10 +92,10 @@ describe("manual interactions", () => {
     expect(state.items).toHaveLength(0);
   });
 
-  it("toggles the bought state", () => {
+  it("removes a row outright", () => {
     let state = reducer(initialState, { type: "add-product", productId: "bread", at: AT });
-    state = reducer(state, { type: "toggle-row", rowId: "bread" });
-    expect(state.items[0].checked).toBe(true);
+    state = reducer(state, { type: "remove-row", rowId: "bread" });
+    expect(state.items).toHaveLength(0);
   });
 });
 
@@ -128,5 +128,25 @@ describe("responses", () => {
     const state = run(initialState, "find toothpaste under $5");
     expect(state.search?.loading).toBe(true);
     expect(state.search?.filters.maxPrice).toBe(5);
+  });
+});
+
+describe("estimated total", () => {
+  it("multiplies only when the spoken unit matches the catalog unit", () => {
+    const water = run(initialState, "add 2 bottles of water");
+    // Water is priced per bottle, so two bottles is twice the price.
+    expect(estimatedTotal(water.items)).toBeCloseTo(1.8, 2);
+  });
+
+  it("does not bill six eggs as six dozen", () => {
+    const eggs = run(initialState, "add 6 eggs");
+    // Eggs are priced per dozen; six of them must not cost 6 x a dozen.
+    expect(estimatedTotal(eggs.items)).toBeLessThan(4);
+  });
+
+  it("ignores items that are not in the catalog", () => {
+    const custom = run(initialState, "add zzyzx widgets");
+    expect(custom.items[0].productId).toBeNull();
+    expect(estimatedTotal(custom.items)).toBe(0);
   });
 });

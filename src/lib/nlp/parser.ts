@@ -302,7 +302,8 @@ export function parseCommand(transcript: string, defaultLang: Lang = "en"): Pars
     ? items.reduce((sum, item) => sum + item.confidence, 0) / items.length
     : 0;
   const intentConfidence = detected === "unknown" ? 0.4 : 0.9;
-  const needsItem = intent === "add" || intent === "remove" || intent === "check" || intent === "uncheck" || intent === "update_quantity";
+  const needsItem =
+    intent === "add" || intent === "remove" || intent === "check" || intent === "update_quantity";
   const confidence = needsItem
     ? Number(((intentConfidence + itemConfidence) / 2).toFixed(2))
     : intentConfidence;

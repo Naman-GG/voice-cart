@@ -36,7 +36,7 @@ function make(
  */
 export function buildSuggestions({ list, history, now = Date.now(), limit = 6 }: SuggestionInput): Suggestion[] {
   const month = new Date(now).getMonth() + 1;
-  const onList = new Set(list.filter((item) => !item.checked).map((item) => item.productId));
+  const onList = new Set(list.map((item) => item.productId));
   const suggestions = new Map<string, Suggestion>();
 
   const add = (suggestion: Suggestion | null) => {
@@ -79,7 +79,7 @@ export function buildSuggestions({ list, history, now = Date.now(), limit = 6 }:
   // 3. Substitutes for what is already on the list.
   for (const item of list) {
     const product = getProduct(item.productId);
-    if (!product || item.checked) continue;
+    if (!product) continue;
     for (const substituteId of product.substitutes ?? []) {
       const substitute = getProduct(substituteId);
       if (!substitute) continue;
@@ -95,7 +95,7 @@ export function buildSuggestions({ list, history, now = Date.now(), limit = 6 }:
   // 4. Complements — things usually bought together.
   for (const item of list) {
     const product = getProduct(item.productId);
-    if (!product || item.checked) continue;
+    if (!product) continue;
     for (const pairId of product.goesWith ?? []) {
       const pair = getProduct(pairId);
       if (!pair) continue;
@@ -183,7 +183,7 @@ export function seasonalHighlights(now = Date.now(), limit = 8): Product[] {
  * Falls back to popular staples for a first-time user.
  */
 export function frequentlyBought(list: ListItem[], history: HistoryEntry[], limit = 6): Product[] {
-  const onList = new Set(list.filter((item) => !item.checked).map((item) => item.productId));
+  const onList = new Set(list.map((item) => item.productId));
   const ranked = [...history]
     .sort((a, b) => b.purchases - a.purchases || (b.addedAt.at(-1) ?? 0) - (a.addedAt.at(-1) ?? 0))
     .map((entry) => getProduct(entry.productId))

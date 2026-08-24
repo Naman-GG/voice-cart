@@ -32,7 +32,7 @@ Two deliberately different halves:
   sharpen recall further.
 - **Understanding is local and deterministic.** Once there is a transcript, intent
   parsing is a **rule-based NLP pipeline** written from scratch — no LLM in the loop.
-  That keeps interpretation free, instant, and covered by **103 unit tests**.
+  That keeps interpretation free, instant, and covered by **106 unit tests**.
 
 ---
 
@@ -88,7 +88,7 @@ Cadence is *learned*: if you actually buy rice every 4 days, that beats the cata
 
 ### 3. Shopping list management
 - Add / remove / update by voice — `Remove milk from my list`, `change milk to 3`,
-  `I bought the eggs`, `clear my list`.
+  `I bought the eggs` (bought means done, so it comes off the list), `clear my list`.
 - **Automatic categorisation** into 12 supermarket aisles, sorted in walking order.
 - **Quantities and units** — `Add 2 bottles of water`, `Buy 5 oranges`, `add 500g paneer`,
   `दो लीटर दूध`. Only a unit you actually say is kept; everything else counts in pieces,
@@ -98,7 +98,9 @@ Cadence is *learned*: if you actually buy rice every 4 days, that beats the cata
   several products named inside one clause are split apart too, so
   `1 kg apples and 1 kg bananas along with 1 kg coriander` yields all three with their
   own quantities.
-- Single-step **undo**, running **cost estimate**, and per-item **substitute swap**.
+- Single-step **undo**, running **cost estimate** (quantity only multiplies when the
+  spoken unit matches the catalog unit, so six eggs are not billed as six dozen), and
+  per-item **substitute swap**.
 - The list is saved to `localStorage`, so it survives a refresh.
 
 ### 4. Voice-activated search
@@ -123,7 +125,7 @@ paper, quiet, on the desk beside it.
 - Loading skeletons while the saved list hydrates and while a search is in flight.
 - Saying **"help"** opens an on-screen command reference grouped by task, with every
   example runnable by tap — a spoken one-liner is too easy to miss.
-- Light and dark themes, full keyboard access, ARIA live regions for screen readers.
+- Full keyboard access and ARIA live regions for screen readers.
 - Graceful degradation: browsers without the Speech API get a clear message and a
   **text command bar** that runs the exact same parser.
 
@@ -137,7 +139,7 @@ paper, quiet, on the desk beside it.
 | Add (natural) | "I need apples and bread" | "मुझे सेब और ब्रेड चाहिए" |
 | Remove | "remove milk from my list" | "दूध हटा दो" |
 | Update quantity | "change milk to 3" | "दूध तीन कर दो" |
-| Mark bought | "I bought the eggs" | "अंडे खरीद लिए" |
+| Bought (removes it) | "I bought the eggs" | "अंडे खरीद लिए" |
 | Clear | "clear my list" | "पूरी लिस्ट हटाओ" |
 | Read back | "what's on my list" | "लिस्ट में क्या है" |
 | Search | "find toothpaste under $5" | "टूथपेस्ट ढूंढो" |
@@ -153,7 +155,7 @@ npm run dev          # http://localhost:3000
 ```
 
 ```bash
-npm test             # 103 unit tests (Vitest)
+npm test             # 106 unit tests (Vitest)
 npm run typecheck    # tsc --noEmit
 npm run lint         # eslint
 npm run build        # production build
