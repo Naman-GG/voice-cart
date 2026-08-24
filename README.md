@@ -1,4 +1,4 @@
-# 🛒 Voice Cart — Voice Command Shopping Assistant
+# Voice Cart — Voice Command Shopping Assistant
 
 Build a shopping list by *talking* to it, in **English or Hindi**. Voice Cart understands
 natural phrasing ("I need two litres of milk"), categorises items automatically, remembers
